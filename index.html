@@ -1,0 +1,2192 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b2545">
+<title>Mission Prep GIS</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --bg:#f4f6fa;--panel:#ffffff;--ink:#1b2430;--mut:#6b7686;--line:#dde3ec;
+  --brand:#0b2545;--acc:#1f7ae0;--ok:#1e9e5a;--warn:#e0912a;--bad:#d64545;
+  --hdr:52px;--sat:env(safe-area-inset-top);--sab:env(safe-area-inset-bottom);
+}
+body.night{--bg:#10151d;--panel:#1a212c;--ink:#e6ebf2;--mut:#93a0b4;--line:#2b3544}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;font-family:-apple-system,"Sarabun","Noto Sans Thai",system-ui,sans-serif;background:var(--bg);color:var(--ink);overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+header{background:var(--brand);color:#fff;padding-top:var(--sat);flex:none;z-index:1200;box-shadow:0 2px 8px #0006}
+.hrow{display:flex;align-items:center;gap:6px;padding:0 8px;height:var(--hdr)}
+.brand{font-weight:700;font-size:15px;white-space:nowrap;display:flex;align-items:center;gap:6px;margin-right:4px}
+.brand small{display:block;font-weight:400;font-size:10px;opacity:.7;line-height:1}
+.tabs{display:flex;gap:4px;flex:1;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;background:transparent;border:0;color:#cfd9ea;padding:9px 13px;border-radius:9px;font-size:14px;white-space:nowrap;min-height:40px}
+.tab.on{background:#fff;color:var(--brand);font-weight:700}
+.tools{display:flex;gap:2px}
+.ibtn{background:transparent;border:0;color:#fff;font-size:19px;width:40px;height:40px;border-radius:9px}
+.ibtn:active,.ibtn.on{background:#ffffff33}
+main{flex:1;position:relative;min-height:0}
+#map{position:absolute;inset:0;z-index:1}
+.leaflet-container{font-family:inherit}
+body.night header{background:#070b12;box-shadow:0 1px 0 #ffffff14}
+body.night .tab.on{background:#e6ebf2;color:#070b12}
+body.night .layerbox,body.night .leaflet-bar a,body.night .leaflet-control-scale-line{background:var(--panel);color:var(--ink);border-color:var(--line)}
+body.night .leaflet-popup-content-wrapper,body.night .leaflet-popup-tip{background:var(--panel);color:var(--ink)}
+body.night .links a,body.night .btn{color:var(--ink)}
+body.night .btn.pri{color:#fff}
+body.night #phandle{background:#070b12}
+
+/* panel: side on wide screens, bottom sheet on phones */
+#panel{position:absolute;z-index:1100;background:var(--panel);display:flex;flex-direction:column;box-shadow:0 0 18px #0004;transition:transform .25s}
+@media(min-width:760px){
+  :root{--pw:390px}
+  body.pwide{--pw:640px}
+  #panel{top:0;bottom:0;left:0;width:var(--pw);max-width:90vw;transform:translateX(-102%);transition:transform .25s,width .25s}
+  #panel.open{transform:none}
+  #panel.open.mini{transform:translateX(-102%)}
+  .leaflet-left{transition:margin-left .25s}
+  body.pano:not(.pmini) .leaflet-left{margin-left:var(--pw)}
+  #pwide{display:inline-block!important}
+  body.pano.pmini #phandle{display:flex}
+}
+#pwide{display:none}
+#phandle{display:none;position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:1150;width:28px;height:64px;border:0;border-radius:0 12px 12px 0;background:var(--brand);color:#fff;font-size:16px;align-items:center;justify-content:center;box-shadow:2px 0 8px #0005;cursor:pointer}
+@media(max-width:759px){
+  #panel{left:0;right:0;bottom:0;height:62%;border-radius:16px 16px 0 0;transform:translateY(102%)}
+  #panel.open{transform:none}
+  #panel.mini{transform:translateY(calc(100% - 46px))}
+}
+.phead{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);gap:8px;flex:none}
+.phead h2{margin:0;font-size:16px;flex:1}
+.pbody{flex:1;overflow-y:auto;padding:12px 14px calc(16px + var(--sab));-webkit-overflow-scrolling:touch}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:9px 13px;min-height:40px;cursor:pointer}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.bad{color:var(--bad)}
+.btn.sm{padding:5px 10px;min-height:32px;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.card{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;background:var(--panel)}
+.card .t{font-weight:700;display:flex;justify-content:space-between;gap:8px}
+.card .s{color:var(--mut);font-size:13px;margin-top:2px;line-height:1.45}
+.pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;background:var(--line);color:var(--ink)}
+.pill.ok{background:#1e9e5a25;color:var(--ok)}.pill.warn{background:#e0912a25;color:var(--warn)}.pill.bad{background:#d6454525;color:var(--bad)}
+.empty{color:var(--mut);text-align:center;padding:26px 8px;font-size:14px}
+.sec{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 4px}
+input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel);min-height:40px}
+label{display:block;font-size:12px;color:var(--mut);margin:10px 0 3px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:14px}
+.kv b{color:var(--mut);font-weight:400}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.stat div{background:var(--bg);border-radius:10px;padding:8px;text-align:center}
+.stat strong{display:block;font-size:18px}.stat span{font-size:11px;color:var(--mut)}
+.links{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.links a{display:block;text-decoration:none;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:14px;background:var(--panel)}
+.links a small{display:block;color:var(--mut);font-size:11px}
+
+/* dialog */
+dialog{border:0;border-radius:16px;padding:0;width:min(520px,94vw);max-height:90vh;background:var(--panel);color:var(--ink);box-shadow:0 10px 40px #0008}
+dialog::backdrop{background:#0008}
+dialog form{padding:14px 16px 16px;max-height:90vh;overflow:auto}
+dialog h3{margin:0 0 4px}
+.toast{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:1300;background:#0b2545ee;color:#fff;padding:9px 16px;border-radius:99px;font-size:14px;display:none;max-width:90%;text-align:center}
+.mk{width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 2px 6px #0007;display:flex;align-items:center;justify-content:center}
+.mk span{transform:rotate(45deg);font-size:14px}
+.wp{background:#fff;border:2px solid var(--acc);color:var(--acc);border-radius:50%;width:24px;height:24px;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
+.ol{padding:0;margin:0;list-style:none}
+.ol li{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.ol li em{font-style:normal;color:var(--mut);font-size:12px;margin-left:auto;white-space:nowrap}
+.layerbox{position:absolute;right:10px;top:10px;z-index:1000;background:var(--panel);border-radius:12px;padding:10px 12px;box-shadow:0 2px 12px #0005;display:none;font-size:14px;min-width:190px}
+.layerbox label{display:flex;gap:8px;align-items:center;margin:0;padding:6px 0;font-size:14px;color:var(--ink)}
+.layerbox input{width:auto;min-height:0}
+
+/* minimal compact controls */
+:root{--hdr:46px}
+.hrow{gap:2px}
+.brand{font-size:14px;margin-right:2px}
+.tabs{gap:0}
+.tab{padding:7px 10px;font-size:13px;min-height:34px;border-radius:7px}
+.tools{gap:0}
+.ibtn{font-size:16px;width:34px;height:34px;border-radius:7px;opacity:.85}
+.btn{border-radius:7px;padding:6px 10px;min-height:34px;font-size:13px;background:transparent}
+.btn.pri{background:var(--acc)}
+.btn.sm{padding:3px 8px;min-height:28px;font-size:12px}
+.row{gap:5px}
+.phead{padding:6px 10px;gap:4px}
+.phead h2{font-size:14px}
+.pbody{padding:8px 10px calc(12px + var(--sab))}
+.card{padding:8px 10px;margin:5px 0;border-radius:9px}
+.sec{margin:12px 0 3px}
+label{margin:7px 0 2px}
+input,select,textarea{padding:6px 9px;min-height:34px;border-radius:7px}
+.links{gap:5px}.links a{padding:7px 9px;border-radius:7px;font-size:13px}
+.stat{gap:5px;margin:7px 0}
+#phandle{width:22px;height:48px;font-size:13px}
+.layerbox{padding:7px 10px;border-radius:9px}
+.layerbox label{padding:3px 0;font-size:13px}
+.layerbox input{padding:0}
+.layerbox{max-height:calc(100% - 20px);overflow:auto;width:250px}
+.rctl{display:none;margin:0 0 4px 22px}
+.rl{font-size:11px;color:var(--mut);line-height:1.4;margin:2px 0}
+.rrow{display:flex;align-items:center;gap:6px;margin:3px 0}
+.rrow span{font-size:11px;color:var(--mut);white-space:nowrap}
+.rrow input[type=range]{flex:1;min-height:20px;border:0;padding:0}
+.trow{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:2px 0}
+.trow i{font-style:normal;cursor:pointer;color:var(--mut);padding:0 4px}
+.tmd-radar-marker{width:26px;height:26px;border-radius:50%;background:rgba(37,99,235,.16);border:1.5px solid #2563eb;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 1px 5px rgba(0,0,0,.4)}
+.tmd-radar-marker.active{background:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.35),0 1px 5px rgba(0,0,0,.4)}
+
+/* measure / grid toolbox */
+#toolbox{position:absolute;right:10px;top:10px;z-index:1150;width:min(310px,calc(100% - 20px));max-height:calc(100% - 20px);overflow:auto;background:var(--panel);border-radius:10px;box-shadow:0 2px 14px #0007;display:none;font-size:13px}
+.thead{display:flex;justify-content:space-between;align-items:center;padding:5px 6px 5px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:1}
+.thead span{display:flex;gap:4px}
+#tbody{padding:0}
+.seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;margin:4px 0}
+.seg button{flex:1;border:0;border-right:1px solid var(--line);background:transparent;color:inherit;padding:4px 3px;font-size:12px;min-height:30px;cursor:pointer;white-space:nowrap}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--acc);color:#fff}
+.tl{font-size:11px;color:var(--mut);margin:8px 0 2px}
+.mp{width:20px;height:20px;border-radius:50%;background:#ffd400;color:#000;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center;border:2px solid #000}
+.apk{width:30px;height:30px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 6px #0008;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff}
+.nvk{width:14px;height:14px;transform:rotate(45deg);border:2px solid #fff;box-shadow:0 1px 4px #0008}
+.wxb{margin-top:6px;min-width:250px}
+.wxh{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.wxh b{font-size:12px}.wxt{font-size:11px;color:var(--mut);flex:1}
+.wxr{font-family:ui-monospace,Consolas,monospace;font-size:11px;line-height:1.5;background:var(--bg);border-radius:7px;padding:6px 8px;margin:4px 0;white-space:pre-wrap;word-break:break-word;color:var(--ink)}
+.wxr.na{color:var(--mut);font-family:inherit}
+.wxl{font-size:10px;color:var(--mut);letter-spacing:.06em;margin-top:6px}
+.wxs{background:#0ea5e90d;border:1px solid #0ea5e933;border-radius:8px;padding:6px;margin:4px 0}
+.wxs .row2{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px}
+.fc{color:#fff;font-size:12px;font-weight:800;padding:1px 10px;border-radius:12px}
+.navr{display:flex;justify-content:space-between;gap:6px;font-size:12px;padding:2px 0;border-bottom:1px dashed var(--line)}
+.navr span:last-child{color:var(--mut);white-space:nowrap}
+.mp.sel{background:#ff4d4d;color:#fff;box-shadow:0 0 0 4px #ff4d4d66}
+.ml{transform:translate(-50%,-50%);position:absolute;background:#000c;color:#fff;font-size:11px;padding:1px 6px;border-radius:9px;white-space:nowrap;border:1px solid #ffffff55;pointer-events:none}
+.gl{position:absolute;font-size:10px;font-weight:700;color:#ffd400;text-shadow:0 0 3px #000,0 0 3px #000,0 0 2px #000;white-space:nowrap;pointer-events:none}
+.gl.gx{transform:translate(-50%,-105%)}
+.gl.gy{transform:translate(3px,-50%)}
+.gl.gs{transform:translate(0,-105%);font-size:12px;color:#00e5ff}
+.ck{display:flex!important;gap:6px;align-items:center;font-size:13px!important;color:var(--ink)!important;margin:3px 0!important}
+.ck input{width:auto;min-height:0;padding:0}
+.cgh{width:16px;height:16px;background:#fff;border:2px solid #00a5c0;border-radius:3px;box-shadow:0 1px 4px #0008}
+.cgh.c{border-radius:50%;width:22px;height:22px;background:#00e5ff;display:flex;align-items:center;justify-content:center;font-size:13px;color:#000;border-color:#fff}
+.cgh.r{border-radius:50%;width:22px;height:22px;background:#ffd400;display:flex;align-items:center;justify-content:center;font-size:14px;color:#000;border-color:#fff}
+.gl.gxc{transform:translate(-50%,-105%);color:#00e5ff;font-size:11px}
+.gl.gr{transform:translate(-105%,-50%);color:#00e5ff;font-size:11px}
+.impc{border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin-top:6px}
+.impc .t{display:flex;justify-content:space-between;gap:6px;font-weight:600;font-size:13px}
+button.cglock{padding:7px 12px;border:0;border-radius:9px;background:var(--panel);color:var(--ink);box-shadow:0 1px 8px #0007;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}
+/* login / profiles / wizard / admin gate */
+#gate{position:fixed;inset:0;z-index:3000;background:var(--bg);display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:16px 12px calc(16px + var(--sab))}
+.gcard{width:min(540px,100%);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin:auto 0}
+.gh{font-size:20px;font-weight:700;margin-bottom:10px}.gh small{display:block;font-size:12px;font-weight:400;color:var(--mut)}
+.gbar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.gwarn{background:#e0912a22;border:1px solid #e0912a66;color:var(--ink);border-radius:9px;padding:8px 10px;font-size:12px;margin-bottom:10px;line-height:1.5}
+.gerr{color:var(--bad);font-size:13px;min-height:18px;margin-top:6px}
+.gsteps{display:flex;gap:6px;margin:4px 0 10px}.gsteps i{flex:1;height:5px;border-radius:3px;background:var(--line)}.gsteps i.on{background:var(--acc)}
+.wc{border:1px solid var(--line);border-radius:10px;padding:8px;margin:6px 0;display:grid;gap:6px}
+.wsum{font-size:12px;color:var(--mut);margin-top:6px;line-height:1.5}
+.alist{display:grid;gap:6px;margin-top:10px}.alist .btn{text-align:left}
+#saveSt{font-size:12px}
+@media(max-width:600px){#acctN{display:none}}
+.mrow{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.mn{flex:1;min-width:0;font-size:13px;line-height:1.35}
+.mn small{display:block;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
+a.btn.call{background:var(--ok);border-color:var(--ok);color:#fff!important;text-decoration:none;display:inline-flex;align-items:center;white-space:nowrap;padding:5px 11px;min-height:36px}
+.prow{display:flex;align-items:center;gap:6px;margin-top:4px}
+.prow b{width:16px;text-align:center;color:var(--mut);font-weight:600}
+.prow input,#tAdd{font-size:12px;font-variant-numeric:tabular-nums;padding:4px 7px;min-height:30px}
+.ol li.mut{color:var(--mut);border:0}
+</style>
+</head>
+<body class="night">
+<div id="app">
+  <header>
+    <div class="hrow">
+      <div class="brand">🚁<div>Mission Prep<small>เตรียมภารกิจ · GIS</small></div></div>
+      <nav class="tabs" id="tabs">
+        <button class="tab" data-t="tools">📏 เครื่องมือ</button>
+        <button class="tab" data-t="fp">Flight Publication</button>
+        <button class="tab" data-t="poc">POC</button>
+        <button class="tab" data-t="ac">Aircraft</button>
+        <button class="tab" data-t="log">บันทึกผลการปฏิบัติ</button>
+      </nav>
+      <div class="tools">
+        <button class="ibtn" id="bAcct" title="บัญชี / โปรไฟล์" style="display:none;width:auto;padding:0 8px;font-size:13px;white-space:nowrap">👤 <span id="acctN"></span> <span id="saveSt"></span></button>
+        <button class="ibtn" id="bLayers" title="เลเยอร์">🗺️</button>
+        <button class="ibtn" id="bLoc" title="ตำแหน่งของฉัน">📍</button>
+        <button class="ibtn" id="bHome" title="กลับกรุงเทพฯ">🏠</button>
+        <button class="ibtn" id="bNight" title="โหมดกลางคืน">🌙</button>
+      </div>
+    </div>
+  </header>
+  <main>
+    <div id="map"></div>
+    <div class="toast" id="toast"></div>
+    <div class="layerbox" id="layerbox">
+      <b>แผนที่ฐาน</b>
+      <label><input type="radio" name="base" value="sat" checked> ดาวเทียม</label>
+      <label><input type="radio" name="base" value="hyb"> Hybrid (ดาวเทียม+ชื่อถนน)</label>
+      <b style="display:block;margin-top:8px">ชั้นข้อมูล</b>
+      <label><input type="checkbox" id="lyPoc" checked> POC</label>
+      <label><input type="checkbox" id="lyRoute" checked> เส้นทางบิน</label>
+      <label><input type="checkbox" id="lyVtr1"> VTR1 กรุงเทพฯ (10 NM)</label>
+      <label><input type="checkbox" id="lyAip" checked> สนามบิน AIP (VTBL/VTBK/VTBD/VTBS)</label>
+      <label><input type="checkbox" id="lyNav"> NAVAID / ILS ของ 4 สนามบิน</label>
+      <label><input type="checkbox" id="lyRes" checked> VTR2/80–83 พระราชวัง (1 NM)</label>
+      <label style="display:block;padding:2px 0 4px"><span style="font-size:12px;color:var(--mut)">ความโปร่งใสพื้นที่ VTR <b id="resTv"></b></span><input type="range" id="resT" min="0" max="100" step="5" value="75" style="padding:0;min-height:24px;border:0"></label>
+      <b style="display:block;margin-top:8px">เรดาร์ฝน</b>
+      <label><input type="checkbox" id="lyRain"> RainViewer (เคลื่อนไหว)</label>
+      <div id="rainCtl" class="rctl">
+        <div id="rainLbl" class="rl"></div>
+        <div class="rrow"><button class="btn sm" id="rainPlay">⏸</button><span>โปร่งใส</span><input type="range" id="rainOp" min="0" max="80" step="5" value="40"></div>
+      </div>
+      <label><input type="checkbox" id="lyTmd"> TMD รายสถานี 📡</label>
+      <div id="tmdCtl" class="rctl">
+        <div id="tmdList"></div>
+        <div class="rrow"><span>โปร่งใส</span><input type="range" id="tmdOp" min="0" max="85" step="5" value="35"></div>
+        <div class="rl">แตะหมุด 📡 บนแผนที่เพื่อเปิด/ปิดภาพเรดาร์ของสถานี (เลือกได้หลายสถานี)</div>
+      </div>
+      <label><input type="checkbox" id="lyTmdC"> TMD ภาพรวมทั้งประเทศ</label>
+      <div id="tmdcCtl" class="rctl">
+        <div class="rrow"><span>โปร่งใส</span><input type="range" id="tmdcOp" min="0" max="85" step="5" value="40"></div>
+      </div>
+    </div>
+    <div id="toolbox" style="display:none">
+      <div id="tbody">
+        <div class="seg" id="tTabs"><button data-tt="m" class="on">วัด/ทิศทาง</button><button data-tt="g">กริดแมพ</button><button data-tt="f">KML/GPX</button></div>
+        <div id="tm">
+          <div class="tl">หน่วยระยะ</div>
+          <div class="seg" id="tUnit"><button data-u="NM" class="on">NM</button><button data-u="KM">KM</button><button data-u="M">Meter</button></div>
+          <div class="tl">โหมดวาด (แตะแผนที่)</div>
+          <div class="seg" id="tMode"><button data-m="line" class="on">📏 เส้น</button><button data-m="circ">⭕ วงกลม</button><button data-m="ll">📍 พิกัด</button><button data-m="off">✋</button></div>
+          <div class="row" style="margin-top:6px"><span style="flex:1;color:var(--mut)">Mag Var (°, E+ / W−)</span><input id="tMv" type="number" step="any" value="0" style="width:80px"></div>
+          <div class="row" style="margin-top:6px"><button class="btn sm" id="tUndo">↶ ย้อน</button><button class="btn sm bad" id="tClr">ล้าง</button></div>
+          <ul class="ol" id="mres" style="margin-top:6px"></ul>
+          <div class="tl">พิกัดแต่ละจุด (Lat/Long · DDM) — แก้ไขแล้วกด Enter</div>
+          <div id="mpts"></div>
+          <div class="row" style="margin-top:6px;flex-wrap:nowrap"><input id="tAdd" placeholder="N13 45.38 E100 30.10" autocapitalize="characters" autocomplete="off" style="flex:1;min-width:0"><button class="btn sm pri" id="tAddB" style="flex:none;white-space:nowrap">＋ เพิ่ม</button></div>
+        </div>
+        <div id="tg" style="display:none">
+          <div class="tl">ระวาง (MGRS) เช่น 47PPR · 47PPR34 · 47PPR3040</div>
+          <input id="gSheet" placeholder="47PPR" autocapitalize="characters" autocomplete="off">
+          <div class="row" style="margin-top:6px"><button class="btn sm pri" id="gDraw">วาดกริดระวาง</button><button class="btn sm" id="gCen">ใช้จุดกลางจอ</button></div>
+          <div class="tl">ช่วงกริด</div>
+          <select id="gInt"><option value="0">อัตโนมัติ</option><option value="100000">100 km</option><option value="10000">10 km</option><option value="1000">1 km</option><option value="100">100 m</option><option value="10">10 m</option></select>
+          <div class="row" style="margin-top:6px"><button class="btn sm" id="gView">▦ กริดตามหน้าจอ</button><button class="btn sm bad" id="gClr">ล้างกริด</button></div>
+          <div id="gInfo" class="tl"></div>
+          <div class="tl" style="margin-top:12px;border-top:1px solid var(--line);padding-top:8px"><b>กริดอิสระ</b> — ลากย้าย / ลากมุมปรับขนาด / ลากปุ่ม ⟳ หมุน</div>
+          <div class="row"><button class="btn sm pri" id="cgNew">✏️ ลากวาดกริด</button><button class="btn sm" id="cgLock">🔓 ล็อกกริด</button><button class="btn sm bad" id="cgClr">ลบกริด</button></div>
+          <div class="tl">กด “ลากวาดกริด” แล้วลากคลุมพื้นที่บนแผนที่ → ปรับขนาด/ย้าย/หมุนได้อิสระ → กด “ล็อกกริด” เมื่อพอใจ</div>
+          <div id="cgForm" style="display:none">
+            <div class="tl">จุดกึ่งกลาง (DDM)</div><input id="cgC" autocomplete="off" style="font-size:12px">
+            <div class="grid2"><div><div class="tl">กว้าง (<span class="uu">NM</span>)</div><input id="cgW" type="number" step="any" inputmode="decimal"></div><div><div class="tl">สูง (<span class="uu">NM</span>)</div><input id="cgH" type="number" step="any" inputmode="decimal"></div></div>
+            <div class="grid2"><div><div class="tl">ขนาดช่อง (เมตร · หลักร้อย)</div><input id="cgS" type="number" min="100" step="100" inputmode="numeric"></div><div><div class="tl">หมุน (°, 0 = เหนือ)</div><input id="cgR" type="number" step="any" inputmode="decimal"></div></div>
+            <label class="ck"><input type="checkbox" id="cgL" checked> ป้ายคอลัมน์ (A, B…) / แถว (1, 2…)</label>
+            <div id="cgInfo" class="tl"></div>
+          </div>
+        </div>
+        <div id="tf" style="display:none">
+          <div class="tl">ส่งออก (Export) — เลือกข้อมูล</div>
+          <label class="ck"><input type="checkbox" id="xPoc" checked> POC</label>
+          <label class="ck"><input type="checkbox" id="xRt" checked> แผนการบิน/เส้นทาง</label>
+          <label class="ck"><input type="checkbox" id="xMeas" checked> เส้นวัด/วงกลม</label>
+          <label class="ck"><input type="checkbox" id="xCg" checked> กริดอิสระ</label>
+          <div class="row" style="margin-top:6px"><button class="btn sm pri" id="xKml">⬇ KML</button><button class="btn sm pri" id="xGpx">⬇ GPX</button></div>
+          <div class="tl" style="margin-top:12px;border-top:1px solid var(--line);padding-top:8px"><b>นำเข้า (Import)</b> .kml / .gpx</div>
+          <button class="btn sm pri" id="iBtn">⬆ เลือกไฟล์</button>
+          <div id="impList"></div>
+        </div>
+      </div>
+    </div>
+    <section id="panel">
+      <div class="phead" id="phead"><h2 id="ptitle"></h2><button class="btn sm" id="padm" style="display:none"></button><button class="btn sm" id="pwide" title="ขยาย/ย่อความกว้าง">⤢</button><button class="btn sm" id="pmini" title="ซ่อน/แสดง">▾</button><button class="btn sm" id="pclose" title="ปิด">✕</button></div>
+      <div class="pbody" id="pbody"></div>
+    </section>
+    <button id="phandle" title="แสดงแถบเครื่องมือ">▶</button>
+  </main>
+</div>
+<dialog id="dlg"><form method="dialog" id="dform"></form></dialog>
+<dialog id="mdlg"><div id="mbody" style="padding:14px 16px 16px"></div></dialog>
+<div id="gate"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+"use strict";
+/* ---------- storage ---------- */
+const KEY="missionprep_v1";
+const newDB=()=>({poc:[],ac:[],routes:[],logs:[],cur:{acId:"",wps:[],reserve:30},mission:{name:"",start:"",end:""},crew:[],imp:[],cg:null,meas:null});
+let DB=newDB();   // = the data of the currently open profile (loaded/saved through the account script at the end of the file)
+const SES={user:null,ownerUid:null,pid:null,name:"",loading:false,viewing:null};
+let dirty=false,saveT=null;
+const save=()=>{if(!SES.pid||SES.loading)return;dirty=true;clearTimeout(saveT);saveT=setTimeout(()=>window.flushSave&&flushSave(),1200);window.setSaveSt&&setSaveSt("wait")};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num=v=>{const n=parseFloat(v);return isFinite(n)?n:0};
+
+/* ---------- constants ---------- */
+const POC_TYPES={
+  lz:{n:"จุดลงจอด/LZ",c:"#1f7ae0",i:"🚁"},
+  cmd:{n:"ศูนย์บัญชาการ/EOC",c:"#0b2545",i:"🏛️"},
+  hosp:{n:"โรงพยาบาล",c:"#d64545",i:"🏥"},
+  shel:{n:"ศูนย์พักพิง",c:"#1e9e5a",i:"⛺"},
+  sup:{n:"จุดรับ-ส่งสิ่งของ",c:"#e0912a",i:"📦"},
+  vic:{n:"พื้นที่ประสบภัย",c:"#8e44ad",i:"🌊"},
+  oth:{n:"อื่นๆ",c:"#6b7686",i:"📌"}
+};
+const AC_STATUS={rdy:["พร้อมใช้","ok"],mx:["ซ่อมบำรุง","warn"],na:["ไม่พร้อม","bad"]};
+const BKK=[13.7563,100.5018];
+
+/* ---------- map ---------- */
+const map=L.map("map",{zoomControl:true,center:BKK,zoom:11,maxZoom:23,tap:true});
+const gt=l=>L.tileLayer("https://mt{s}.google.com/vt/lyrs="+l+"&hl=th&x={x}&y={y}&z={z}",{subdomains:"0123",maxNativeZoom:21,maxZoom:23,attribution:"© Google"});
+const bases={sat:gt("s"),hyb:gt("y")};
+let curBase="sat";bases.sat.addTo(map);
+const gPoc=L.layerGroup().addTo(map),gRoute=L.layerGroup().addTo(map),gTmp=L.layerGroup().addTo(map);
+let radar=null;
+L.control.scale({imperial:false,nautical:false}).addTo(map);
+
+function setBase(k){map.removeLayer(bases[curBase]);curBase=k;bases[k].addTo(map).bringToBack()}
+document.querySelectorAll('input[name=base]').forEach(r=>r.onchange=()=>setBase(r.value));
+$("#lyPoc").onchange=e=>e.target.checked?map.addLayer(gPoc):map.removeLayer(gPoc);
+$("#lyRoute").onchange=e=>e.target.checked?map.addLayer(gRoute):map.removeLayer(gRoute);
+$("#bLayers").onclick=()=>{const b=$("#layerbox");b.style.display=b.style.display==="block"?"none":"block";if(b.style.display==="block")toolOpen(false)};
+$("#bHome").onclick=()=>map.setView(BKK,11);
+function setTheme(night){
+  document.body.classList.toggle("night",night);
+  $("#bNight").textContent=night?"☀️":"🌙";
+  $("#bNight").title=night?"สลับเป็นโหมดกลางวัน":"สลับเป็นโหมดกลางคืน";
+  document.querySelector('meta[name=theme-color]').content=night?"#070b12":"#0b2545";
+  try{localStorage.setItem(KEY+"_theme",night?"night":"day")}catch(_){}
+}
+$("#bNight").onclick=()=>setTheme(!document.body.classList.contains("night"));
+let _th="night";try{_th=localStorage.getItem(KEY+"_theme")||"night"}catch(_){}
+setTheme(_th!=="day");
+let me=null;
+$("#bLoc").onclick=()=>{
+  if(!navigator.geolocation)return toast("อุปกรณ์ไม่รองรับ GPS");
+  navigator.geolocation.getCurrentPosition(p=>{
+    const ll=[p.coords.latitude,p.coords.longitude];
+    if(me)me.remove();
+    me=L.circleMarker(ll,{radius:8,color:"#fff",weight:3,fillColor:"#1f7ae0",fillOpacity:1}).addTo(map);
+    map.setView(ll,14);
+  },()=>toast("ไม่สามารถระบุตำแหน่งได้"),{enableHighAccuracy:true,timeout:10000});
+};
+let toastT;
+function toast(m,ms=2600){const t=$("#toast");t.textContent=m;t.style.display="block";clearTimeout(toastT);if(ms)toastT=setTimeout(()=>t.style.display="none",ms)}
+
+/* ---------- geo helpers ---------- */
+const NM=1852;
+function distNM(a,b){return map.distance([a.lat,a.lng],[b.lat,b.lng])/NM}
+function brg(a,b){
+  const r=Math.PI/180,y=Math.sin((b.lng-a.lng)*r)*Math.cos(b.lat*r),
+  x=Math.cos(a.lat*r)*Math.sin(b.lat*r)-Math.sin(a.lat*r)*Math.cos(b.lat*r)*Math.cos((b.lng-a.lng)*r);
+  return (Math.atan2(y,x)/r+360)%360;
+}
+function dms(v,isLat){   // name kept for existing callers — now DDM (degrees + decimal minutes, 2 decimals)
+  const h=isLat?(v>=0?"N":"S"):(v>=0?"E":"W");v=Math.abs(v);
+  let d=Math.floor(v),m=+((v-d)*60).toFixed(2);if(m>=60){d++;m=0}
+  return `${h}${String(d).padStart(isLat?2:3,"0")}°${m.toFixed(2).padStart(5,"0")}'`;
+}
+function fmtDDM(lat,lng){return dms(lat,true)+" "+dms(lng,false)}
+const hm=h=>{const m=Math.round(h*60);return `${Math.floor(m/60)}:${String(m%60).padStart(2,"0")}`};
+
+/* ---------- map-pick mode ---------- */
+let pickCb=null;
+function pick(msg,cb){pickCb=cb;toast(msg,0);map.getContainer().style.cursor="crosshair"}
+function endPick(){pickCb=null;$("#toast").style.display="none";map.getContainer().style.cursor=""}
+map.on("click",e=>{
+  if(pickCb){const cb=pickCb;endPick();cb(e.latlng);return}
+  if(toolClick(e.latlng))return;
+  if(tab==="fp"&&addingWp){addWp({lat:+e.latlng.lat.toFixed(5),lng:+e.latlng.lng.toFixed(5),name:"WP"+(DB.cur.wps.length+1)});}
+});
+
+/* ---------- generic form dialog ---------- */
+function form(title,fields,vals,onSave,extra){
+  const f=$("#dform");
+  f.innerHTML=`<h3>${esc(title)}</h3>`+fields.map(x=>{
+    const v=vals[x.k]??"";
+    let inp;
+    if(x.t==="select")inp=`<select name="${x.k}">${x.o.map(([k,l])=>`<option value="${esc(k)}" ${k==v?"selected":""}>${esc(l)}</option>`).join("")}</select>`;
+    else if(x.t==="area")inp=`<textarea name="${x.k}" rows="3">${esc(v)}</textarea>`;
+    else inp=`<input name="${x.k}" type="${x.t||"text"}" ${x.t==="number"?'step="any" inputmode="decimal"':""} value="${esc(v)}" ${x.r?"required":""} ${x.ph?`placeholder="${esc(x.ph)}"`:""}>`;
+    return `<div data-k="${x.k}"><label>${esc(x.l)}</label>${inp}</div>`;
+  }).join("")+`<div class="row" style="margin-top:14px;justify-content:flex-end">${extra||""}<button type="button" class="btn" id="fcancel">ยกเลิก</button><button class="btn pri" value="ok">บันทึก</button></div>`;
+  const d=$("#dlg");
+  f.onsubmit=ev=>{
+    ev.preventDefault();
+    if(!f.reportValidity())return;
+    const o={};new FormData(f).forEach((v,k)=>o[k]=v);
+    d.close();onSave(o);
+  };
+  $("#fcancel").onclick=()=>d.close();
+  d.showModal();
+  return f;
+}
+
+/* ---------- panel / tabs ---------- */
+let tab=null,addingWp=false;
+const TITLES={tools:"เครื่องมือแผนที่ · วัด / กริด / ไฟล์",poc:"POC · จุดติดต่อ/พื้นที่ปฏิบัติ",ac:"Aircraft · อากาศยาน",fp:"Flight Publication · แผนการบิน",log:"บันทึกผลการปฏิบัติ"};
+function openTab(t){
+  tab=t;addingWp=false;toolOpen(t==="tools");
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
+  $("#panel").classList.add("open");$("#panel").classList.remove("mini");
+  document.body.classList.add("pano");
+  render();setTimeout(()=>map.invalidateSize(),260);
+}
+function closePanel(){
+  tab=null;addingWp=false;toolOpen(false);
+  document.querySelectorAll(".tab").forEach(b=>b.classList.remove("on"));
+  $("#panel").classList.remove("open");document.body.classList.remove("pano");
+  setTimeout(()=>map.invalidateSize(),260);
+}
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>tab===b.dataset.t?closePanel():openTab(b.dataset.t));
+$("#pclose").onclick=closePanel;
+$("#pmini").onclick=()=>$("#panel").classList.toggle("mini");
+$("#phandle").onclick=()=>$("#panel").classList.remove("mini");
+$("#pwide").onclick=()=>{document.body.classList.toggle("pwide");setTimeout(()=>map.invalidateSize(),280)};
+$("#phead").onclick=e=>{if(innerWidth<760&&$("#panel").classList.contains("mini")&&!e.target.closest("button"))$("#panel").classList.remove("mini")};
+new MutationObserver(()=>{
+  const m=$("#panel").classList.contains("mini");
+  document.body.classList.toggle("pmini",m);
+  $("#pmini").textContent=innerWidth<760?(m?"▴":"▾"):"◀";
+  setTimeout(()=>map.invalidateSize(),280);
+}).observe($("#panel"),{attributes:true,attributeFilter:["class"]});
+function render(){
+  if(!tab)return;
+  if(tab!=="tools")$("#toolbox").appendChild(TB);
+  $("#ptitle").textContent=TITLES[tab];
+  if(tab!=="poc")$("#padm").style.display="none";
+  ({tools:rTools,poc:rPoc,ac:rAc,fp:rFp,log:rLog})[tab]();
+}
+const body=()=>$("#pbody");
+
+/* ============ POC ============ */
+function drawPoc(){
+  gPoc.clearLayers();
+  DB.poc.forEach(p=>{
+    const T=POC_TYPES[p.type]||POC_TYPES.oth;
+    const ic=L.divIcon({className:"",html:`<div class="mk" style="background:${T.c}"><span>${T.i}</span></div>`,iconSize:[30,30],iconAnchor:[15,30]});
+    L.marker([p.lat,p.lng],{icon:ic}).addTo(gPoc)
+     .bindPopup(`<b>${esc(p.name)}</b><br>${T.n}${p.phone?`<br>☎ <a href="tel:${esc(p.phone)}">${esc(p.phone)}</a>`:""}<br><small>${dms(p.lat,1)} ${dms(p.lng,0)}</small>`);
+  });
+}
+function rPts(){
+  const q=(window._pq||"").toLowerCase();
+  const list=DB.poc.filter(p=>!q||(p.name+p.contact+p.district+p.note).toLowerCase().includes(q));
+  body().innerHTML=`
+   <div class="row"><button class="btn pri" id="pAdd">＋ เพิ่ม POC (แตะแผนที่)</button>
+   <button class="btn" id="pExp">⬇ Export</button><button class="btn" id="pImp">⬆ Import</button></div>
+   <input id="pq" placeholder="🔍 ค้นหา ชื่อ/เขต/ผู้ติดต่อ" value="${esc(window._pq||"")}" style="margin-top:10px">
+   <div class="sec">${list.length} รายการ</div>
+   ${list.length?list.map(p=>{const T=POC_TYPES[p.type]||POC_TYPES.oth;return `
+    <div class="card"><div class="t"><span>${T.i} ${esc(p.name)}</span><span class="pill">${T.n}</span></div>
+    <div class="s">${p.district?esc(p.district)+" · ":""}${dms(p.lat,1)} ${dms(p.lng,0)}<br>
+    ${p.contact?"👤 "+esc(p.contact)+" ":""}${p.phone?`☎ <a href="tel:${esc(p.phone)}">${esc(p.phone)}</a>`:""}${p.note?"<br>"+esc(p.note):""}</div>
+    <div class="row" style="margin-top:8px"><button class="btn sm" data-go="${p.id}">🎯 ไปที่จุด</button>${ADMIN?`<button class="btn sm" data-ed="${p.id}">แก้ไข</button><button class="btn sm bad" data-del="${p.id}">ลบ</button>`:""}</div></div>`}).join(""):`<div class="empty">ยังไม่มี POC<br>กด “เพิ่ม POC” แล้วแตะตำแหน่งบนแผนที่</div>`}`;
+  $("#pAdd").onclick=()=>{
+    $("#panel").classList.add("mini");
+    pick("แตะแผนที่เพื่อวางจุด POC",ll=>{$("#panel").classList.remove("mini");pocForm({lat:+ll.lat.toFixed(5),lng:+ll.lng.toFixed(5)})});
+  };
+  $("#pq").oninput=e=>{window._pq=e.target.value;const pos=e.target.selectionStart;rPoc();const i=$("#pq");i.focus();i.setSelectionRange(pos,pos)};
+  $("#pExp").onclick=()=>download("poc.json",JSON.stringify(DB.poc,null,1),"application/json");
+  $("#pImp").onclick=()=>importJson(a=>{if(Array.isArray(a)){a.forEach(x=>{if(isFinite(x.lat)&&isFinite(x.lng))DB.poc.push({...x,id:uid()})});save();drawPoc();rPoc();toast("นำเข้าแล้ว")}});
+  body().querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{const p=DB.poc.find(x=>x.id===b.dataset.go);map.setView([p.lat,p.lng],15);if(innerWidth<760)$("#panel").classList.add("mini")});
+  body().querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>pocForm(DB.poc.find(x=>x.id===b.dataset.ed)));
+  body().querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{if(confirm("ลบ POC นี้?")){DB.poc=DB.poc.filter(x=>x.id!==b.dataset.del);save();drawPoc();rPoc()}});
+}
+/* ---- POC: crew per aircraft (from the mission profile) with one-tap call ---- */
+window._pv=window._pv||"team";
+let ADMIN=false;   // true only when the signed-in account has role "admin" (see account script)
+const ROLES=["นบ.","ชอ.","สอ.","ผดส."];
+function rPoc(){
+  if(!ADMIN)window._pv="team";   // members see only the names + phone list; edit crew via "แก้ไขข้อมูลภารกิจ"
+  (window._pv==="pt"?rPts:rTeams)();
+  if(ADMIN){
+    body().insertAdjacentHTML("afterbegin",`<div class="seg" id="pvSeg" style="margin:0 0 8px"><button data-v="team" class="${window._pv==="team"?"on":""}">👥 ผู้ปฏิบัติภารกิจ</button><button data-v="pt" class="${window._pv==="pt"?"on":""}">📍 จุดบนแผนที่ (${DB.poc.length})</button></div>`);
+    $("#pvSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{window._pv=b.dataset.v;rPoc()});
+  }
+  $("#padm").style.display="none";
+}
+const telHref=p=>"tel:"+String(p||"").replace(/[^\d+]/g,"");
+function crewGroups(){
+  const g=DB.ac.map(a=>({id:a.id,title:`${a.type||"?"} · ${a.reg||"?"}`,ms:DB.crew.filter(m=>m.acId===a.id)}));
+  const lost=DB.crew.filter(m=>!DB.ac.some(a=>a.id===m.acId));
+  if(lost.length)g.push({id:"",title:"ไม่ระบุอากาศยาน",ms:lost});
+  return g;
+}
+function rTeams(){
+  const q=(window._tq||"").trim().toLowerCase();
+  const hit=(g,m)=>!q||`${g.title} ${m.role} ${m.rank} ${m.name} ${m.phone}`.toLowerCase().includes(q);
+  const gs=crewGroups().map(g=>({g,ms:g.ms.filter(m=>hit(g,m))})).filter(x=>q?x.ms.length:true);
+  const M=DB.mission||{},fd=s=>s?new Date(s).toLocaleString("th-TH",{dateStyle:"medium",timeStyle:"short"}):"";
+  body().innerHTML=`
+   ${M.start||M.end?`<div class="rl">📅 ${esc(fd(M.start))} → ${esc(fd(M.end))}</div>`:""}
+   ${ADMIN?`<div class="row" style="margin:6px 0"><button class="btn pri" id="tmAdd">＋ เพิ่มบุคคล</button></div>`:""}
+   <input id="tq" placeholder="🔍 ค้นหา ชื่อ / ตำแหน่ง / เบอร์โทร" value="${esc(window._tq||"")}">
+   <div class="sec">${DB.ac.length} ลำ · ${DB.crew.length} คน</div>
+   ${gs.map(({g,ms})=>{const w=ms.reduce((s,m)=>s+(+m.weight||0),0);return `<div class="card"><div class="t"><span>🚁 ${esc(g.title)}</span><span class="pill">${g.ms.length} คน${w?` · ⚖ ${w} กก.`:""}</span></div>
+     ${ms.map(m=>`<div class="mrow"><span class="pill">${esc(m.role||"-")}</span>
+       <div class="mn"><b>${esc(m.rank||"")} ${esc(m.name)}</b><small>${esc(m.phone||"ไม่มีเบอร์")}${m.weight!==""&&m.weight!=null?` · ${esc(m.weight)} กก.`:""}</small></div>
+       ${m.phone?`<a class="btn call" href="${telHref(m.phone)}" title="โทร ${esc(m.name)}">📞 โทร</a>`:""}
+       ${ADMIN?`<button class="btn sm" data-em="${m.id}" title="แก้ไข">✎</button><button class="btn sm bad" data-dm="${m.id}" title="ลบ">✕</button>`:""}</div>`).join("")||`<div class="rl">ยังไม่มีผู้ปฏิบัติภารกิจ</div>`}</div>`}).join("")||`<div class="empty">${q?"ไม่พบรายการที่ค้นหา":"ยังไม่มีข้อมูล — เพิ่มได้ที่เมนูบัญชี 👤 → “แก้ไขข้อมูลภารกิจ”"}</div>`}`;
+  if(ADMIN)$("#tmAdd").onclick=()=>memberForm({});
+  $("#tq").oninput=e=>{window._tq=e.target.value;const pos=e.target.selectionStart;rPoc();const i=$("#tq");i.focus();i.setSelectionRange(pos,pos)};
+  body().querySelectorAll("[data-em]").forEach(b=>b.onclick=()=>memberForm(DB.crew.find(m=>m.id===b.dataset.em)));
+  body().querySelectorAll("[data-dm]").forEach(b=>b.onclick=()=>{const m=DB.crew.find(x=>x.id===b.dataset.dm);if(confirm(`ลบ ${m.name}?`)){DB.crew=DB.crew.filter(x=>x!==m);save();rPoc()}});
+}
+function memberForm(m){
+  form(m.id?"แก้ไขบุคคล":"เพิ่มบุคคล",[
+    {k:"acId",l:"ขึ้นเครื่องลำ",t:"select",o:[["","— ไม่ระบุ —"],...DB.ac.map(a=>[a.id,`${a.type} · ${a.reg}`])]},
+    {k:"role",l:"หน้าที่ในเครื่อง",t:"select",o:ROLES.map(r=>[r,r])},
+    {k:"rank",l:"ยศ"},{k:"name",l:"ชื่อ-นามสกุล",r:1},
+    {k:"weight",l:"น้ำหนักตัว (กก.)",t:"number"},{k:"phone",l:"เบอร์ติดต่อ",t:"tel"}
+  ],m,o=>{
+    o.weight=o.weight===""?"":num(o.weight);
+    if(m.id)Object.assign(m,o);else DB.crew.push({id:uid(),...o});
+    save();rPoc();
+  });
+}
+function pocForm(p,prev){
+  const v=prev||{...p,coord:isFinite(p.lat)&&isFinite(p.lng)?fmtDDM(p.lat,p.lng):""};
+  form(p.id?"แก้ไข POC":"เพิ่ม POC",[
+    {k:"name",l:"ชื่อจุด/สถานที่",r:1},
+    {k:"type",l:"ประเภท",t:"select",o:Object.entries(POC_TYPES).map(([k,v])=>[k,v.n])},
+    {k:"district",l:"เขต/ที่ตั้ง"},
+    {k:"coord",l:"พิกัด Lat/Long (DDM) เช่น N13 45.38 E100 30.10",r:1},
+    {k:"contact",l:"ผู้ประสานงาน"},{k:"phone",l:"โทรศัพท์",t:"tel"},
+    {k:"note",l:"หมายเหตุ (เช่น ขนาด LZ, สิ่งกีดขวาง, ความต้องการ)",t:"area"}
+  ],v,o=>{
+    const ll=parseCoord(o.coord);
+    if(!ll){toast("พิกัดไม่ถูกต้อง เช่น N13 45.38 E100 30.10");pocForm(p,o);return}
+    delete o.coord;o.lat=+ll.lat.toFixed(6);o.lng=+ll.lng.toFixed(6);
+    if(p.id)Object.assign(DB.poc.find(x=>x.id===p.id),o);else DB.poc.push({...o,id:uid()});
+    save();drawPoc();if(tab==="poc")rPoc();map.panTo([o.lat,o.lng]);
+  });
+}
+
+/* ============ Aircraft ============ */
+function rAc(){
+  body().innerHTML=`
+   <div class="links" style="margin-bottom:10px"><a target="_blank" rel="noopener" href="https://w2ict.github.io/H135WB/">⚖️ H135 Weight &amp; Balance<small>เปิดในแท็บใหม่</small></a></div>
+   <div class="row"><button class="btn pri" id="aAdd">＋ เพิ่มอากาศยาน</button></div>
+   <div class="sec">${DB.ac.length} ลำ</div>
+   ${DB.ac.length?DB.ac.map(a=>{const st=AC_STATUS[a.status]||AC_STATUS.rdy;return `
+    <div class="card"><div class="t"><span>🚁 ${esc(a.reg)} <small style="font-weight:400;color:var(--mut)">${esc(a.type)}</small></span><span class="pill ${st[1]}">${st[0]}</span></div>
+    <div class="kv" style="margin-top:6px">
+      <b>ฐานที่ตั้ง</b><span>${esc(a.base||"-")}</span>
+      <b>ความเร็วเดินทาง</b><span>${a.speed||0} kt</span>
+      <b>อัตราสิ้นเปลือง</b><span>${a.burn||0} ${esc(a.fuelU||"kg")}/hr</span>
+      <b>ความทนทาน</b><span>${a.endur||0} hr (${a.fuelCap||0} ${esc(a.fuelU||"kg")})</span>
+      <b>บรรทุก/ที่นั่ง</b><span>${a.payload||0} kg · ${a.seats||0} คน</span>
+      ${a.hoist?`<b>อุปกรณ์</b><span>${esc(a.hoist)}</span>`:""}
+    </div>
+    <div class="row" style="margin-top:8px"><button class="btn sm" data-ed="${a.id}">แก้ไข</button><button class="btn sm bad" data-del="${a.id}">ลบ</button></div></div>`}).join(""):`<div class="empty">ยังไม่มีข้อมูลอากาศยาน<br>เพิ่มเพื่อใช้คำนวณเวลา/เชื้อเพลิงใน Flight Publication</div>`}`;
+  $("#aAdd").onclick=()=>acForm({status:"rdy",fuelU:"kg",speed:100});
+  body().querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>acForm(DB.ac.find(x=>x.id===b.dataset.ed)));
+  body().querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{if(confirm("ลบอากาศยานนี้?")){DB.ac=DB.ac.filter(x=>x.id!==b.dataset.del);save();rAc()}});
+}
+function acForm(a){
+  form(a.id?"แก้ไขอากาศยาน":"เพิ่มอากาศยาน",[
+    {k:"reg",l:"ทะเบียน/หมายเลขเครื่อง",r:1},{k:"type",l:"แบบ (เช่น UH-60, Bell 412, EC725)",r:1},
+    {k:"base",l:"ฐานที่ตั้ง"},{k:"status",l:"สถานะ",t:"select",o:Object.entries(AC_STATUS).map(([k,v])=>[k,v[0]])},
+    {k:"speed",l:"ความเร็วเดินทาง (kt)",t:"number"},{k:"burn",l:"อัตราสิ้นเปลือง (ต่อชม.)",t:"number"},
+    {k:"fuelU",l:"หน่วยเชื้อเพลิง",t:"select",o:[["kg","kg"],["lb","lb"],["L","ลิตร"]]},
+    {k:"fuelCap",l:"ความจุเชื้อเพลิงใช้ได้",t:"number"},{k:"endur",l:"ความทนทาน (ชม.)",t:"number"},
+    {k:"payload",l:"น้ำหนักบรรทุกสูงสุด (kg)",t:"number"},{k:"seats",l:"จำนวนที่นั่ง/ผู้โดยสาร",t:"number"},
+    {k:"hoist",l:"อุปกรณ์พิเศษ (Hoist, Bambi bucket, FLIR…)"}
+  ],a,o=>{
+    ["speed","burn","fuelCap","endur","payload","seats"].forEach(k=>o[k]=num(o[k]));
+    if(a.id)Object.assign(DB.ac.find(x=>x.id===a.id),o);else DB.ac.push({...o,id:uid()});
+    save();rAc();
+  });
+}
+
+/* ============ Flight Publication ============ */
+function addWp(w){DB.cur.wps.push(w);save();drawRoute();rFp()}
+function routeStats(wps,ac,reserveMin){
+  let d=0;const legs=[];
+  for(let i=1;i<wps.length;i++){const x=distNM(wps[i-1],wps[i]);d+=x;legs.push({d:x,b:brg(wps[i-1],wps[i])})}
+  const spd=ac?.speed||0,ete=spd?d/spd:0;
+  const fuel=ac?.burn?ac.burn*(ete+reserveMin/60):0;
+  return{d,legs,ete,fuel,spd};
+}
+function drawRoute(){
+  gRoute.clearLayers();
+  const w=DB.cur.wps;
+  if(w.length>1)L.polyline(w.map(x=>[x.lat,x.lng]),{color:"#1f7ae0",weight:4,dashArray:"8 6"}).addTo(gRoute);
+  w.forEach((x,i)=>{
+    L.marker([x.lat,x.lng],{icon:L.divIcon({className:"",html:`<div class="wp">${i+1}</div>`,iconSize:[24,24],iconAnchor:[12,12]}),draggable:true})
+     .addTo(gRoute).bindTooltip(x.name)
+     .on("dragend",e=>{const p=e.target.getLatLng();x.lat=+p.lat.toFixed(5);x.lng=+p.lng.toFixed(5);save();drawRoute();if(tab==="fp")rFp()});
+  });
+}
+function rFp(){
+  const c=DB.cur,ac=DB.ac.find(a=>a.id===c.acId),S=routeStats(c.wps,ac,c.reserve);
+  const fu=ac?.fuelU||"kg";
+  body().innerHTML=`
+   <div class="sec" style="margin-top:0">วางแผนเส้นทาง</div>
+   <label>อากาศยาน</label>
+   <select id="fAc"><option value="">— เลือก —</option>${DB.ac.map(a=>`<option value="${a.id}" ${a.id===c.acId?"selected":""}>${esc(a.reg)} · ${esc(a.type)}</option>`).join("")}</select>
+   <div class="row" style="margin-top:10px">
+     <button class="btn ${addingWp?"pri":""}" id="fTap">${addingWp?"● แตะแผนที่เพื่อเพิ่มจุด (กดเพื่อหยุด)":"＋ เพิ่มจุดจากแผนที่"}</button>
+   </div>
+   <div class="row" style="margin-top:8px"><select id="fPoc" style="flex:1"><option value="">＋ เพิ่มจาก POC…</option>${DB.poc.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></div>
+   <ul class="ol" style="margin-top:8px">${c.wps.map((w,i)=>`<li><b>${i+1}</b><span>${esc(w.name)}</span>
+     <em>${i?`${S.legs[i-1].d.toFixed(1)} NM · ${Math.round(S.legs[i-1].b)}°`:"เริ่มต้น"}</em>
+     <button class="btn sm" data-up="${i}" ${i?"":"disabled"}>↑</button><button class="btn sm bad" data-rm="${i}">✕</button></li>`).join("")||`<li class="empty" style="display:block;border:0">ยังไม่มีจุดในเส้นทาง</li>`}</ul>
+   <div class="stat"><div><strong>${S.d.toFixed(1)}</strong><span>ระยะ NM</span></div><div><strong>${S.spd?hm(S.ete):"-"}</strong><span>ETE ชม:นาที</span></div><div><strong>${S.fuel?Math.round(S.fuel):"-"}</strong><span>เชื้อเพลิง ${fu}</span></div></div>
+   <label>เชื้อเพลิงสำรอง (นาที)</label><input id="fRes" type="number" value="${c.reserve}" inputmode="numeric">
+   ${ac&&S.fuel&&ac.fuelCap&&S.fuel>ac.fuelCap?`<div class="card" style="border-color:var(--bad);color:var(--bad)">⚠ เชื้อเพลิงที่ต้องการเกินความจุ (${ac.fuelCap} ${fu})</div>`:""}
+   ${ac&&S.ete&&ac.endur&&S.ete+c.reserve/60>ac.endur?`<div class="card" style="border-color:var(--bad);color:var(--bad)">⚠ เวลาบินรวมสำรองเกินความทนทาน (${ac.endur} ชม.)</div>`:""}
+   <div class="row" style="margin-top:12px"><button class="btn pri" id="fSave" ${c.wps.length<2?"disabled":""}>💾 บันทึกแผนการบิน</button><button class="btn bad" id="fClr">ล้าง</button><button class="btn" id="fFit" ${c.wps.length?"":"disabled"}>🎯 ดูทั้งเส้นทาง</button></div>
+
+   <div class="sec">แผนที่บันทึกไว้ (${DB.routes.length})</div>
+   ${DB.routes.map(r=>`<div class="card"><div class="t"><span>${esc(r.name)}</span><span class="pill">${r.d.toFixed(1)} NM</span></div>
+     <div class="s">${r.wps.map(w=>esc(w.name)).join(" → ")}<br>${esc(r.acLabel||"-")} · ETE ${r.ete?hm(r.ete):"-"}</div>
+     <div class="row" style="margin-top:8px"><button class="btn sm" data-ld="${r.id}">โหลด</button><button class="btn sm bad" data-dr="${r.id}">ลบ</button></div></div>`).join("")||`<div class="empty">ยังไม่มีแผนที่บันทึก</div>`}
+
+   ${aipCards()}
+   <div class="sec">Flight Publication / อ้างอิงภายนอก</div>
+   <div class="links">
+     <a target="_blank" rel="noopener" href="https://w2ict.github.io/AIPTH-GIS/">AIP Thailand GIS<small>สนามบิน/NAVAID</small></a>
+     <a target="_blank" rel="noopener" href="https://notams.aim.faa.gov/notamSearch/">NOTAM<small>ค้นหา NOTAM</small></a>
+     <a target="_blank" rel="noopener" href="https://www.windy.com/13.75/100.50?13.75,100.50,9">Windy<small>ลม/ฝน</small></a>
+     <a target="_blank" rel="noopener" href="https://weather.tmd.go.th/">TMD<small>กรมอุตุนิยมวิทยา</small></a>
+     <a target="_blank" rel="noopener" href="https://skyvector.com/?ll=13.75,100.50&chart=301&zoom=6">SkyVector<small>แผนที่การบิน</small></a>
+     <a target="_blank" rel="noopener" href="https://www.flightradar24.com/13.75,100.50/10">Flightradar24<small>สถานการณ์จราจร</small></a>
+   </div>`;
+  bindAip();
+  $("#fAc").onchange=e=>{DB.cur.acId=e.target.value;save();rFp()};
+  $("#fRes").onchange=e=>{DB.cur.reserve=num(e.target.value);save();rFp()};
+  $("#fTap").onclick=()=>{addingWp=!addingWp;if(addingWp&&innerWidth<760)$("#panel").classList.add("mini");toast(addingWp?"แตะแผนที่เพื่อเพิ่มจุด":"หยุดเพิ่มจุด",1500);rFp()};
+  $("#fPoc").onchange=e=>{const p=DB.poc.find(x=>x.id===e.target.value);if(p)addWp({lat:p.lat,lng:p.lng,name:p.name})};
+  body().querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{c.wps.splice(+b.dataset.rm,1);save();drawRoute();rFp()});
+  body().querySelectorAll("[data-up]").forEach(b=>b.onclick=()=>{const i=+b.dataset.up;[c.wps[i-1],c.wps[i]]=[c.wps[i],c.wps[i-1]];save();drawRoute();rFp()});
+  $("#fClr").onclick=()=>{if(!c.wps.length||confirm("ล้างเส้นทางปัจจุบัน?")){c.wps=[];save();drawRoute();rFp()}};
+  $("#fFit").onclick=()=>{map.fitBounds(L.latLngBounds(c.wps.map(w=>[w.lat,w.lng])),{padding:[50,50]});if(innerWidth<760)$("#panel").classList.add("mini")};
+  $("#fSave").onclick=()=>form("บันทึกแผนการบิน",[{k:"name",l:"ชื่อแผน/ภารกิจ",r:1}],{name:c.wps[0].name+" → "+c.wps[c.wps.length-1].name},o=>{
+    DB.routes.push({id:uid(),name:o.name,wps:JSON.parse(JSON.stringify(c.wps)),d:S.d,ete:S.ete,fuel:S.fuel,acId:c.acId,acLabel:ac?ac.reg+" "+ac.type:"",reserve:c.reserve});
+    save();rFp();toast("บันทึกแล้ว");
+  });
+  body().querySelectorAll("[data-ld]").forEach(b=>b.onclick=()=>{const r=DB.routes.find(x=>x.id===b.dataset.ld);c.wps=JSON.parse(JSON.stringify(r.wps));c.acId=r.acId||"";c.reserve=r.reserve??30;save();drawRoute();rFp();$("#fFit").click()});
+  body().querySelectorAll("[data-dr]").forEach(b=>b.onclick=()=>{if(confirm("ลบแผนนี้?")){DB.routes=DB.routes.filter(x=>x.id!==b.dataset.dr);save();rFp()}});
+}
+
+/* ============ Logs ============ */
+function rLog(){
+  const L_=[...DB.logs].sort((a,b)=>(b.date+b.off).localeCompare(a.date+a.off));
+  const tot=L_.reduce((s,l)=>s+num(l.hours),0),pax=L_.reduce((s,l)=>s+num(l.pax),0),kg=L_.reduce((s,l)=>s+num(l.cargo),0);
+  body().innerHTML=`
+   <div class="row"><button class="btn pri" id="lAdd">＋ บันทึกภารกิจ</button><button class="btn" id="lCsv">⬇ CSV</button></div>
+   <div class="stat"><div><strong>${L_.length}</strong><span>เที่ยวบิน</span></div><div><strong>${tot.toFixed(1)}</strong><span>ชม.บิน</span></div><div><strong>${pax} / ${kg}</strong><span>คน / kg</span></div></div>
+   ${L_.map(l=>`<div class="card"><div class="t"><span>${esc(l.mission)}</span><span class="pill ${l.result==="ok"?"ok":l.result==="part"?"warn":"bad"}">${{ok:"สำเร็จ",part:"บางส่วน",fail:"ไม่สำเร็จ"}[l.result]||"-"}</span></div>
+    <div class="s">📅 ${esc(l.date)} ${esc(l.off||"")}${l.land?"–"+esc(l.land):""} · ${l.hours||0} ชม.<br>🚁 ${esc(l.acLabel||"-")} ${l.route?"· 🧭 "+esc(l.route):""}<br>
+    👥 ${l.pax||0} คน · 📦 ${l.cargo||0} kg · ⛽ ${l.fuel||0}${l.crew?"<br>ลูกเรือ: "+esc(l.crew):""}${l.note?"<br>"+esc(l.note):""}</div>
+    <div class="row" style="margin-top:8px"><button class="btn sm" data-ed="${l.id}">แก้ไข</button><button class="btn sm bad" data-del="${l.id}">ลบ</button></div></div>`).join("")||`<div class="empty">ยังไม่มีบันทึกผลการปฏิบัติ</div>`}`;
+  $("#lAdd").onclick=()=>logForm({date:new Date().toISOString().slice(0,10),result:"ok"});
+  $("#lCsv").onclick=()=>{
+    const cols=["date","off","land","mission","acLabel","route","crew","hours","pax","cargo","fuel","result","note"];
+    const csv="﻿"+cols.join(",")+"\n"+DB.logs.map(l=>cols.map(k=>`"${String(l[k]??"").replace(/"/g,'""')}"`).join(",")).join("\n");
+    download("mission_log.csv",csv,"text/csv");
+  };
+  body().querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>logForm(DB.logs.find(x=>x.id===b.dataset.ed)));
+  body().querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{if(confirm("ลบบันทึกนี้?")){DB.logs=DB.logs.filter(x=>x.id!==b.dataset.del);save();rLog()}});
+}
+function logForm(l){
+  form(l.id?"แก้ไขบันทึก":"บันทึกผลการปฏิบัติ",[
+    {k:"mission",l:"ภารกิจ",r:1,ph:"เช่น ลำเลียงถุงยังชีพ เขตบางพลัด"},{k:"date",l:"วันที่",t:"date",r:1},
+    {k:"off",l:"เวลาขึ้น",t:"time"},{k:"land",l:"เวลาลง",t:"time"},
+    {k:"acId",l:"อากาศยาน",t:"select",o:[["","—"],...DB.ac.map(a=>[a.id,a.reg+" · "+a.type])]},
+    {k:"route",l:"เส้นทาง",t:"select",o:[["","—"],...DB.routes.map(r=>[r.name,r.name])]},
+    {k:"crew",l:"ลูกเรือ"},{k:"hours",l:"ชั่วโมงบิน",t:"number"},
+    {k:"pax",l:"ผู้โดยสาร/ผู้ประสบภัยที่ช่วย (คน)",t:"number"},{k:"cargo",l:"สิ่งของที่ลำเลียง (kg)",t:"number"},
+    {k:"fuel",l:"เชื้อเพลิงที่ใช้",t:"number"},
+    {k:"result",l:"ผลการปฏิบัติ",t:"select",o:[["ok","สำเร็จ"],["part","สำเร็จบางส่วน"],["fail","ไม่สำเร็จ"]]},
+    {k:"note",l:"ปัญหา/ข้อเสนอแนะ/บทเรียน",t:"area"}
+  ],l,o=>{
+    const a=DB.ac.find(x=>x.id===o.acId);o.acLabel=a?a.reg+" "+a.type:"";
+    if(l.id)Object.assign(DB.logs.find(x=>x.id===l.id),o);else DB.logs.push({...o,id:uid()});
+    save();rLog();
+  });
+}
+
+/* ---------- utils ---------- */
+function download(name,text,type){
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove();
+}
+function importJson(cb){
+  const i=document.createElement("input");i.type="file";i.accept=".json,application/json";
+  i.onchange=()=>{const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{cb(JSON.parse(r.result))}catch(e){toast("ไฟล์ไม่ถูกต้อง")}};r.readAsText(f)};
+  i.click();
+}
+
+/* ============ Measure / Heading / Grid tools ============ */
+const gMeas=L.layerGroup().addTo(map),gMeasG=L.layerGroup().addTo(map),gGrid=L.layerGroup().addTo(map);
+const UNITS={NM:{f:1852,d:2},KM:{f:1000,d:2},M:{f:1,d:0}};
+const TOOL={open:false,sel:null,tab:"m",mode:"line",unit:"NM",mv:0,pts:[],c:null,e:null};
+const pad=(n,w)=>String(n).padStart(w,"0");
+const fmtD=m=>{const u=UNITS[TOOL.unit];return (m/u.f).toLocaleString("en-US",{minimumFractionDigits:u.d,maximumFractionDigits:u.d})+" "+TOOL.unit};
+const hav=(a,b)=>{const R=6371008.8,r=Math.PI/180,x=Math.sin((b.lat-a.lat)*r/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin((b.lng-a.lng)*r/2)**2;return 2*R*Math.asin(Math.sqrt(x))};
+// aircraft-style heading: 3 digits, 360 = north; T = true, M = magnetic (true − East variation)
+const hdg=(a,b)=>{const h=(((brg(a,b)-TOOL.mv)%360)+360)%360;let r=Math.round(h);if(r===0)r=360;return pad(r,3)+"°"+(TOOL.mv?"M":"T")};
+// DDM = degrees + decimal minutes
+function parseCoord(s){
+  const tok=String(s).toUpperCase().replace(/[°'′"″,;]/g," ").match(/[NSEW]|-?\d+(?:\.\d+)?/g)||[];
+  const lead=/^[NSEW]/.test(tok[0]||"");let parts=[],cur={h:null,n:[]};
+  for(const t of tok){
+    if(/[NSEW]/.test(t)){if(lead){if(cur.n.length||cur.h){parts.push(cur);cur={h:null,n:[]}}cur.h=t}else{cur.h=t;parts.push(cur);cur={h:null,n:[]}}}
+    else cur.n.push(+t);
+  }
+  if(cur.n.length||cur.h)parts.push(cur);
+  if(parts.length!==2){
+    const n=tok.filter(t=>!/[NSEW]/.test(t)).map(Number);
+    if(n.length===4)parts=[{h:null,n:n.slice(0,2)},{h:null,n:n.slice(2)}];
+    else if(n.length===2)parts=[{h:null,n:[n[0]]},{h:null,n:[n[1]]}];
+    else return null;
+  }
+  if(/[EW]/.test(parts[0].h||"")&&/[NS]/.test(parts[1].h||""))parts.reverse();
+  const val=(p,lim)=>{
+    if(!p.n.length||p.n.length>2)return NaN;
+    let v,neg=p.n[0]<0||Object.is(p.n[0],-0);
+    if(p.n.length===2)v=Math.abs(p.n[0])+p.n[1]/60;
+    else{v=Math.abs(p.n[0]);if(v>lim)v=Math.floor(v/100)+(v%100)/60}  // ddmm.mmm
+    if(p.h)neg=p.h==="S"||p.h==="W";
+    return neg?-v:v;
+  };
+  const lat=val(parts[0],90),lng=val(parts[1],180);
+  return(Math.abs(lat)<=90&&Math.abs(lng)<=180)?L.latLng(lat,lng):null;
+}
+const mkLabel=(ll,t)=>L.marker(ll,{interactive:false,icon:L.divIcon({className:"",html:`<div class="ml">${t}</div>`,iconSize:[0,0]})}).addTo(gMeasG);
+// measure points are selectable: tap a point → it turns red with a 🗑 popup; Delete/Backspace also removes it
+const selIs=k=>TOOL.sel&&TOOL.sel.k===k.k&&TOOL.sel.i===k.i;
+const mkPt=(ll,txt,onDrag,key)=>{
+  const on=selIs(key),m=L.marker(ll,{draggable:toolLive(),interactive:toolLive(),icon:L.divIcon({className:"",html:`<div class="mp${on?" sel":""}">${txt}</div>`,iconSize:[20,20],iconAnchor:[10,10]})}).addTo(gMeas)
+    .on("drag",e=>onDrag(e.target.getLatLng(),true))
+    .on("dragend",e=>onDrag(e.target.getLatLng()))
+    .on("click",()=>{TOOL.sel=key;drawMeas()});
+  if(on&&toolLive())m.bindPopup(`<button class="btn sm bad" onclick="delSel()">🗑 ลบจุดนี้</button><br><small>หรือกดปุ่ม Delete</small>`,{closeButton:false,offset:[0,-6]}).openPopup();
+  return m;
+};
+function delSel(){
+  const s=TOOL.sel;if(!s)return;
+  if(s.k==="p")TOOL.pts.splice(s.i,1);
+  else if(s.k==="R")TOOL.e=null;
+  else if(s.k==="C"){TOOL.c=null;TOOL.e=null}
+  TOOL.sel=null;map.closePopup();drawMeas();
+}
+document.addEventListener("keydown",e=>{
+  if((e.key==="Delete"||e.key==="Backspace")&&TOOL.sel&&toolLive()&&!/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||"")){e.preventDefault();delSel()}
+});
+
+const circShow=()=>TOOL.mode==="circ"||(TOOL.mode!=="line"&&(TOOL.c||TOOL.e));
+function measRows(){
+  const rows=[];
+  if(TOOL.mode==="circ"||TOOL.c){if(TOOL.c)rows.push(["C",TOOL.c,ll=>TOOL.c=ll,{k:"C"}]);if(TOOL.e)rows.push(["R",TOOL.e,ll=>TOOL.e=ll,{k:"R"}])}
+  TOOL.pts.forEach((q,i)=>rows.push([i+1,q,ll=>TOOL.pts[i]=ll,{k:"p",i}]));
+  return rows;
+}
+// lines / circle / labels / result list / coordinate fields — cheap, called on every drag event so everything follows in real time
+function drawMeasGfx(){
+  gMeasG.clearLayers();
+  let h="";
+  if(circShow()){
+    const c=TOOL.c,e=TOOL.e;
+    if(c&&e){
+      const r=hav(c,e);
+      L.circle(c,{radius:r,color:"#ffd400",weight:2,fillOpacity:.08,interactive:false}).addTo(gMeasG);
+      L.polyline([c,e],{color:"#ffd400",weight:2,dashArray:"5 5",interactive:false}).addTo(gMeasG);
+      mkLabel(L.latLng((c.lat+e.lat)/2,(c.lng+e.lng)/2),`${hdg(c,e)} · R ${fmtD(r)}`);
+      h=`<li><b>รัศมี</b><span>HDG ${hdg(c,e)}</span><em>${fmtD(r)}</em></li><li><b>เส้นผ่านศูนย์กลาง</b><span></span><em>${fmtD(2*r)}</em></li>`;
+    }else h=`<li class="mut">${c?"แตะเพื่อกำหนดขอบวงกลม":"แตะแผนที่เพื่อกำหนดจุดศูนย์กลาง"}</li>`;
+  }
+  if(TOOL.pts.length){
+    const p=TOOL.pts;let tot=0;
+    if(p.length>1)L.polyline(p,{color:"#ffd400",weight:3,interactive:false}).addTo(gMeasG);
+    p.forEach((q,i)=>{
+      if(i){
+        const d=hav(p[i-1],q);tot+=d;
+        mkLabel(L.latLng((p[i-1].lat+q.lat)/2,(p[i-1].lng+q.lng)/2),`${hdg(p[i-1],q)} · ${fmtD(d)}`);
+        h+=`<li><b>${i}→${i+1}</b><span>HDG ${hdg(p[i-1],q)}</span><em>${fmtD(d)}</em></li>`;
+      }
+    });
+    h+=p.length>1?`<li><b>รวม</b><span>${p.length-1} ช่วง</span><em>${fmtD(tot)}</em></li>`:`<li class="mut">แตะเพื่อวางจุดถัดไป</li>`;
+  }else if(!h)h=`<li class="mut">${TOOL.mode==="ll"?"แตะแผนที่เพื่อดูพิกัด":TOOL.mode==="off"?"ปิดการวาดชั่วคราว (เลื่อนแผนที่ได้ตามปกติ)":"แตะแผนที่เพื่อวางจุดวัดระยะ"}</li>`;
+  TB.querySelector("#mres").innerHTML=h;
+  const rows=measRows();
+  TB.querySelector("#mpts").querySelectorAll("input").forEach((inp,i)=>{const r=rows[i];if(r&&document.activeElement!==inp)inp.value=fmtDDM(r[1].lat,r[1].lng)});
+}
+let _lastMeas="";
+function drawMeas(){
+  gMeas.clearLayers();
+  const upd=set=>(ll,live)=>{set(ll);live?drawMeasGfx():drawMeas()};   // live = during drag (keep the dragged marker alive)
+  if(circShow()){
+    if(TOOL.c)mkPt(TOOL.c,"C",upd(ll=>TOOL.c=ll),{k:"C"});
+    if(TOOL.c&&TOOL.e)mkPt(TOOL.e,"R",upd(ll=>TOOL.e=ll),{k:"R"});
+  }
+  TOOL.pts.forEach((q,i)=>mkPt(q,i+1,upd(ll=>TOOL.pts[i]=ll),{k:"p",i}));
+  drawMeasGfx();
+  const rows=measRows();
+  TB.querySelector("#mpts").innerHTML=rows.map((r,i)=>`<div class="prow"><b>${r[0]}</b><input data-ri="${i}" value="${fmtDDM(r[1].lat,r[1].lng)}" autocapitalize="characters" autocomplete="off"><button class="btn sm bad" data-rd="${i}" title="ลบจุดนี้">✕</button></div>`).join("");
+  TB.querySelector("#mpts").querySelectorAll("[data-rd]").forEach(b=>b.onclick=()=>{TOOL.sel=rows[+b.dataset.rd][3];delSel()});
+  TB.querySelector("#mpts").querySelectorAll("input").forEach(inp=>inp.onchange=()=>{
+    const ll=parseCoord(inp.value),r=rows[+inp.dataset.ri];
+    if(!ll){toast("พิกัดไม่ถูกต้อง เช่น N13 45.38 E100 30.10");inp.value=fmtDDM(r[1].lat,r[1].lng);return}
+    r[2](ll);drawMeas();map.panTo(ll);
+  });
+  const ms=JSON.stringify([TOOL.pts.map(p=>[p.lat,p.lng]),TOOL.c&&[TOOL.c.lat,TOOL.c.lng],TOOL.e&&[TOOL.e.lat,TOOL.e.lng]]);
+  if(ms!==_lastMeas){_lastMeas=ms;if(!SES.loading){const j=JSON.parse(ms);DB.meas={pts:j[0],c:j[1],e:j[2]};save()}}   // persist measurements in the profile
+}
+function toolClick(ll){
+  if(!TOOL.open||TOOL.tab!=="m"||TOOL.mode==="off")return false;
+  TOOL.sel=null;
+  if(TOOL.mode==="line")TOOL.pts.push(ll);
+  else if(TOOL.mode==="circ"){if(!TOOL.c||TOOL.e){TOOL.c=ll;TOOL.e=null}else TOOL.e=ll}
+  else if(TOOL.mode==="ll"){
+    L.popup().setLatLng(ll).setContent(`<b>${toMGRS(ll.lat,ll.lng,5)}</b><br>${fmtDDM(ll.lat,ll.lng)}`).openOn(map);
+    return true;
+  }
+  drawMeas();return true;
+}
+const TB=$("#tbody");   // toolbox content lives in the left panel while the "เครื่องมือ" tab is active, parked in #toolbox otherwise
+function rTools(){const b=body();b.innerHTML="";b.appendChild(TB);TB.style.display="block"}
+function toolOpen(o){
+  TOOL.open=o;
+  if(o){$("#layerbox").style.display="none";addingWp=false}
+  applyToolTab();
+}
+// Only the sub-function of the active toolbox tab is live; the others are locked
+// (measure taps / draggable measure points → "วัด/ทิศทาง" only; grid handles → "กริดแมพ" only).
+const toolLive=()=>TOOL.open&&TOOL.tab==="m";
+function applyToolTab(){
+  if(!(TOOL.open&&TOOL.tab==="g"))cgCancelDraw();
+  map.getContainer().style.cursor=(toolLive()&&TOOL.mode!=="off")?"crosshair":"";
+  if(TOOL.open&&TOOL.tab==="g"&&!CG.locked)map.addLayer(gCGh);else map.removeLayer(gCGh);
+  if(!toolLive())map.closePopup();
+  drawMeas();
+}
+const seg=(id,attr,fn)=>$(id).querySelectorAll("button").forEach(b=>b.onclick=()=>{$(id).querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));fn(b.dataset[attr])});
+seg("#tTabs","tt",t=>{["m","g","f"].forEach(k=>$("#t"+k).style.display=k===t?"block":"none");TOOL.tab=t;applyToolTab()});
+seg("#tUnit","u",u=>{TOOL.unit=u;drawMeas();cgSync()});
+seg("#tMode","m",m=>{TOOL.mode=m;map.getContainer().style.cursor=m==="off"?"":"crosshair";drawMeas()});
+$("#tMv").oninput=e=>{TOOL.mv=num(e.target.value);drawMeas()};
+$("#tUndo").onclick=()=>{TOOL.sel=null;if(TOOL.mode==="circ"){if(TOOL.e)TOOL.e=null;else TOOL.c=null}else TOOL.pts.pop();drawMeas()};
+function addByCoord(){
+  const ll=parseCoord($("#tAdd").value);
+  if(!ll)return toast("พิกัดไม่ถูกต้อง เช่น N13 45.38 E100 30.10");
+  if(TOOL.mode==="circ"){if(!TOOL.c||TOOL.e){TOOL.c=ll;TOOL.e=null}else TOOL.e=ll}
+  else{if(TOOL.mode!=="line"){TOOL.mode="line";$("#tMode").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.m==="line"))}TOOL.pts.push(ll)}
+  $("#tAdd").value="";drawMeas();map.panTo(ll);
+}
+$("#tAddB").onclick=addByCoord;
+$("#tAdd").onkeydown=e=>{if(e.key==="Enter")addByCoord()};
+$("#tClr").onclick=()=>{TOOL.sel=null;TOOL.pts=[];TOOL.c=TOOL.e=null;map.closePopup();drawMeas()};
+
+/* --- UTM / MGRS (WGS84, Krüger series) --- */
+const _n=1/298.257223563/(2-1/298.257223563),AA=6378137/(1+_n)*(1+_n*_n/4+_n**4/64),K0=.9996;
+const AL=[_n/2-2*_n**2/3+5*_n**3/16,13*_n**2/48-3*_n**3/5,61*_n**3/240];
+const BE=[_n/2-2*_n**2/3+37*_n**3/96,_n**2/48+_n**3/15,17*_n**3/480];
+const DE=[2*_n-2*_n**2/3-2*_n**3,7*_n**2/3-8*_n**3/5,56*_n**3/15];
+function toUTM(lat,lon,zone){
+  zone=zone||Math.floor((lon+180)/6)+1;
+  const r=Math.PI/180,dl=lon*r-((zone-1)*6-177)*r,s=Math.sin(lat*r),c=2*Math.sqrt(_n)/(1+_n);
+  const t=Math.sinh(Math.atanh(s)-c*Math.atanh(c*s));
+  const x0=Math.atan2(t,Math.cos(dl)),y0=Math.asinh(Math.sin(dl)/Math.hypot(t,Math.cos(dl)));
+  let xi=x0,eta=y0;
+  for(let j=1;j<=3;j++){xi+=AL[j-1]*Math.sin(2*j*x0)*Math.cosh(2*j*y0);eta+=AL[j-1]*Math.cos(2*j*x0)*Math.sinh(2*j*y0)}
+  const south=lat<0;
+  return{zone,south,E:500000+K0*AA*eta,N:(south?1e7:0)+K0*AA*xi};
+}
+function fromUTM(zone,E,N,south){
+  const r=Math.PI/180,xi=(N-(south?1e7:0))/(K0*AA),eta=(E-500000)/(K0*AA);
+  let x0=xi,y0=eta;
+  for(let j=1;j<=3;j++){x0-=BE[j-1]*Math.sin(2*j*xi)*Math.cosh(2*j*eta);y0-=BE[j-1]*Math.cos(2*j*xi)*Math.sinh(2*j*eta)}
+  const chi=Math.asin(Math.sin(x0)/Math.cosh(y0));
+  let ph=chi;for(let j=1;j<=3;j++)ph+=DE[j-1]*Math.sin(2*j*chi);
+  return L.latLng(ph/r,((zone-1)*6-177)+Math.atan2(Math.sinh(y0),Math.cos(x0))/r);
+}
+const BANDS="CDEFGHJKLMNPQRSTUVWX",ROWS="ABCDEFGHJKLMNPQRSTUV",COLS=["ABCDEFGH","JKLMNPQR","STUVWXYZ"];
+function toMGRS(lat,lon,d=5){
+  if(lat<-80||lat>84)return "-";
+  const u=toUTM(lat,lon),band=BANDS[Math.min(19,Math.floor((lat+80)/8))];
+  const col=COLS[(u.zone-1)%3][Math.floor(u.E/1e5)-1],row=ROWS[(Math.floor(u.N/1e5)+(u.zone%2?0:5))%20],s=10**(5-d);
+  return `${u.zone}${band} ${col}${row}`+(d?` ${pad(Math.floor(u.E%1e5/s),d)} ${pad(Math.floor(u.N%1e5/s),d)}`:"");
+}
+function parseMGRS(str){
+  const m=str.toUpperCase().replace(/\s+/g,"").match(/^(\d{1,2})([C-HJ-NP-X])([A-HJ-NP-Z])([A-HJ-NP-V])(\d*)$/);
+  if(!m||m[5].length%2||m[5].length>10)return null;
+  const zone=+m[1],bi=BANDS.indexOf(m[2]),ci=COLS[(zone-1)%3].indexOf(m[3]),ri=ROWS.indexOf(m[4]);
+  if(ci<0||zone<1||zone>60)return null;
+  const d=m[5].length/2,size=10**(5-d),off=zone%2?0:5;
+  const cen=toUTM(-80+bi*8+4,(zone-1)*6-177,zone).N;
+  let best=null;
+  for(let k=Math.floor(cen/1e5)-12;k<=Math.floor(cen/1e5)+12;k++){
+    if(((k+off)%20+20)%20!==ri)continue;
+    const dd=Math.abs(k*1e5+5e4-cen);if(!best||dd<best.dd)best={k,dd};
+  }
+  return{zone,south:bi<10,size,name:`${zone}${m[2]}${m[3]}${m[4]}${m[5]?" "+m[5].slice(0,d)+" "+m[5].slice(d):""}`,
+    E0:(ci+1)*1e5+(d?+m[5].slice(0,d)*size:0),N0:best.k*1e5+(d?+m[5].slice(d)*size:0)};
+}
+
+/* --- grid drawing --- */
+const GRID={sheet:null,view:false};
+function drawGrid(fit){
+  gGrid.clearLayers();$("#gInfo").textContent="";
+  let z,south,E0,N0,E1,N1;
+  if(GRID.sheet){const s=GRID.sheet;z=s.zone;south=s.south;E0=s.E0;N0=s.N0;E1=E0+s.size;N1=N0+s.size}
+  else if(GRID.view){
+    const b=map.getBounds(),c=map.getCenter(),u=toUTM(c.lat,c.lng);z=u.zone;south=u.south;
+    const p=[];for(let i=0;i<=4;i++)for(let j=0;j<=4;j++)p.push(toUTM(b.getSouth()+(b.getNorth()-b.getSouth())*i/4,b.getWest()+(b.getEast()-b.getWest())*j/4,z));
+    E0=Math.min(...p.map(q=>q.E));E1=Math.max(...p.map(q=>q.E));N0=Math.min(...p.map(q=>q.N));N1=Math.max(...p.map(q=>q.N));
+  }else return;
+  const span=Math.max(E1-E0,N1-N0);
+  let I=+$("#gInt").value;
+  if(!I)I=GRID.sheet?Math.max(1,GRID.sheet.size/10):([1e5,1e4,1e3,100,10].find(i=>span/i>=5)||10);
+  else if(span/I>120){$("#gInfo").textContent="⚠ ช่วงกริดถี่เกินไปสำหรับพื้นที่นี้ — ซูมเข้าหรือเลือกช่วงที่กว้างขึ้น";return}
+  const vb=map.getBounds().pad(.05),S=GRID.sheet?24:48;
+  const dg=I>=1000?0:I>=100?1:I>=10?2:3;
+  const lab=v=>dg?((v/1000)%100).toFixed(dg):pad(Math.floor(v/1000)%100,2);
+  const put=(ll,t,cls)=>L.marker(ll,{interactive:false,icon:L.divIcon({className:"",html:`<div class="gl ${cls}">${t}</div>`,iconSize:[0,0]})}).addTo(gGrid);
+  const line=(pts,v,major,cls,pick)=>{
+    L.polyline(pts,{color:"#ffd400",weight:major?1.6:1,opacity:major?.9:.55,interactive:false}).addTo(gGrid);
+    const ins=pts.filter(q=>vb.contains(q));
+    if(ins.length)put(ins.reduce(pick),lab(v),cls);
+  };
+  for(let e=Math.ceil(E0/I)*I;e<=E1+1e-6;e+=I){
+    const pts=[];for(let k=0;k<=S;k++)pts.push(fromUTM(z,e,N0+(N1-N0)*k/S,south));
+    line(pts,e,Math.round(e/I)%10===0,"gx",(a,b)=>b.lat<a.lat?b:a);
+  }
+  for(let n=Math.ceil(N0/I)*I;n<=N1+1e-6;n+=I){
+    const pts=[];for(let k=0;k<=S;k++)pts.push(fromUTM(z,E0+(E1-E0)*k/S,n,south));
+    line(pts,n,Math.round(n/I)%10===0,"gy",(a,b)=>b.lng<a.lng?b:a);
+  }
+  if(GRID.sheet){
+    const o=[];[[E0,N0,E1,N0],[E1,N0,E1,N1],[E1,N1,E0,N1],[E0,N1,E0,N0]].forEach(([a,b,c,d])=>{for(let k=0;k<S;k++)o.push(fromUTM(z,a+(c-a)*k/S,b+(d-b)*k/S,south))});o.push(o[0]);
+    const pl=L.polyline(o,{color:"#00e5ff",weight:3,interactive:false}).addTo(gGrid);
+    put(fromUTM(z,E0,N1,south),GRID.sheet.name,"gs");
+    if(fit)map.fitBounds(pl.getBounds(),{padding:[30,30]});
+  }
+  $("#gInfo").textContent=`โซน ${z}${south?"S":"N"} · ช่วงกริด ${I>=1000?I/1000+" km":I+" m"}${GRID.sheet?" · ระวาง "+GRID.sheet.name:" · ตามหน้าจอ"}`;
+}
+$("#gDraw").onclick=()=>{
+  const s=parseMGRS($("#gSheet").value);
+  if(!s)return toast("รูปแบบระวางไม่ถูกต้อง เช่น 47PPR หรือ 47PPR34");
+  GRID.sheet=s;GRID.view=false;$("#gView").classList.remove("pri");drawGrid(true);
+};
+$("#gCen").onclick=()=>{const c=map.getCenter();$("#gSheet").value=toMGRS(c.lat,c.lng,1).replace(/\s+/g,"")};
+$("#gInt").onchange=()=>drawGrid(false);
+$("#gView").onclick=()=>{GRID.view=!GRID.view;GRID.sheet=null;$("#gView").classList.toggle("pri",GRID.view);GRID.view?drawGrid(false):(gGrid.clearLayers(),$("#gInfo").textContent="")};
+$("#gClr").onclick=()=>{GRID.sheet=null;GRID.view=false;$("#gView").classList.remove("pri");gGrid.clearLayers();$("#gInfo").textContent=""};
+let _gt;map.on("moveend",()=>{if(GRID.view&&!GRID.sheet){clearTimeout(_gt);_gt=setTimeout(()=>drawGrid(false),120)}});
+
+/* ============ Layer: Bangkok restricted areas (from bangkok_restricted_areas_reference.kml) ============ */
+const RES_AREAS=[
+  ["VTR1","BANGKOK CITY",13.76500000,100.53833333,10],
+  ["VTR2","CHITRLADA PALACE",13.76810556,100.52123333,1],
+  ["VTR80","SRAPATHUM PALACE",13.74796944,100.53220000,1],
+  ["VTR81","JAKRIBONGKOT PALACE",13.94675278,100.52413889,1],
+  ["VTR82","AMPHORN ROYAL PALACE",13.77263889,100.51118889,1],
+  ["VTR83","SUKOTHAI PALACE",13.78240556,100.50930833,1]
+];
+const gRes=L.layerGroup().addTo(map);
+function circlePts(lat,lng,rM,n=120){
+  const R=6371008.8,r=Math.PI/180,d=rM/R,p1=lat*r,l1=lng*r,o=[];
+  for(let i=0;i<n;i++){
+    const b=2*Math.PI*i/n,p2=Math.asin(Math.sin(p1)*Math.cos(d)+Math.cos(p1)*Math.sin(d)*Math.cos(b));
+    o.push([p2/r,(l1+Math.atan2(Math.sin(b)*Math.sin(d)*Math.cos(p1),Math.cos(d)-Math.sin(p1)*Math.sin(p2)))/r]);
+  }
+  return o;
+}
+const gVtr1=L.layerGroup(); // VTR1 hidden by default
+const resPolys=[];
+RES_AREAS.forEach(([id,nm,lat,lng,nmR])=>{
+  const g=id==="VTR1"?gVtr1:gRes;
+  const pg=L.polygon(circlePts(lat,lng,nmR*1852),{color:"#ff2d2d",weight:2,fillColor:"#ff2d2d",fillOpacity:.15})
+   .addTo(g).bindPopup(`<b>${id} – ${nm}</b><br>รัศมี ${nmR} NM<br><small>${dms(lat,1)} ${dms(lng,0)}<br>ตรวจสอบกับ AIP/NOTAM ปัจจุบันก่อนใช้งานจริง</small>`);
+  resPolys.push(pg);
+  L.marker([lat,lng],{interactive:false,icon:L.divIcon({className:"",html:`<div class="ml" style="background:#b00000cc">${id}</div>`,iconSize:[0,0]})}).addTo(g);
+});
+$("#lyVtr1").onchange=e=>e.target.checked?map.addLayer(gVtr1):map.removeLayer(gVtr1);
+$("#lyRes").onchange=e=>e.target.checked?map.addLayer(gRes):map.removeLayer(gRes);
+// transparency slider: 0% = most opaque fill, 100% = fully transparent fill (outline stays)
+function setResTrans(t){
+  resPolys.forEach(p=>p.setStyle({fillOpacity:.6*(1-t/100)}));
+  $("#resTv").textContent=t+"%";
+  try{localStorage.setItem(KEY+"_resT",t)}catch(_){}
+}
+$("#resT").oninput=e=>setResTrans(+e.target.value);
+let _rt=75;try{const v=localStorage.getItem(KEY+"_resT");if(v!==null)_rt=+v}catch(_){}
+$("#resT").value=_rt;setResTrans(_rt);
+
+/* ============ Free-form grid (move / resize / rotate) ============ */
+const CG={on:false,c:null,w:0,h:0,s:0,rot:0,lab:true,locked:false};   // sizes in meters
+const gCG=L.layerGroup().addTo(map),gCGh=L.layerGroup().addTo(map);
+let cgHd=null;
+const RM=6371008.8,RD=Math.PI/180;
+const uF=()=>UNITS[TOOL.unit].f,uD=()=>UNITS[TOOL.unit].d;
+const fmtU=m=>(m/uF()).toFixed(uD())+" "+TOOL.unit;
+function cgPt(x,y){
+  const t=CG.rot*RD,E=x*Math.cos(t)+y*Math.sin(t),N=-x*Math.sin(t)+y*Math.cos(t);
+  return L.latLng(CG.c.lat+N/RM/RD,CG.c.lng+E/(RM*Math.cos(CG.c.lat*RD))/RD);
+}
+function cgLocal(ll){
+  const t=CG.rot*RD,E=(ll.lng-CG.c.lng)*RD*RM*Math.cos(CG.c.lat*RD),N=(ll.lat-CG.c.lat)*RD*RM;
+  return{x:E*Math.cos(t)-N*Math.sin(t),y:E*Math.sin(t)+N*Math.cos(t)};
+}
+const colName=i=>{let s="";i++;while(i>0){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26)}return s};
+function cgGeo(){
+  if(!CG.on)return null;
+  let s=CG.s,warn="";
+  if(Math.ceil(CG.w/s-1e-9)>150||Math.ceil(CG.h/s-1e-9)>150){s=Math.ceil(Math.max(CG.w,CG.h)/150/100)*100;warn=" ⚠ ช่องถี่เกินไป แสดงที่ "+fmtU(s)}
+  const hw=CG.w/2,hh=CG.h/2,P=cgPt,v=[],h=[];
+  for(let x=-hw+s;x<hw-1e-6;x+=s)v.push([P(x,-hh),P(x,hh)]);
+  for(let y=-hh+s;y<hh-1e-6;y+=s)h.push([P(-hw,y),P(hw,y)]);
+  return{s,warn,hw,hh,v,h,nc:Math.ceil(CG.w/s-1e-9),nr:Math.ceil(CG.h/s-1e-9),outline:[P(-hw,-hh),P(hw,-hh),P(hw,hh),P(-hw,hh)]};
+}
+function cgDraw(){
+  gCG.clearLayers();
+  const g=cgGeo();
+  if(!g){$("#cgInfo").textContent="";return}
+  const st={color:"#00e5ff",weight:1,opacity:.85,interactive:false};
+  g.v.concat(g.h).forEach(l=>L.polyline(l,st).addTo(gCG));
+  L.polygon(g.outline,{color:"#00e5ff",weight:3,fill:false,interactive:false}).addTo(gCG);
+  const put=(ll,t,cls)=>L.marker(ll,{interactive:false,icon:L.divIcon({className:"",html:`<div class="gl ${cls}">${t}</div>`,iconSize:[0,0]})}).addTo(gCG);
+  if(CG.lab){
+    for(let j=0;j<g.nc;j++){const x0=-g.hw+j*g.s,x1=Math.min(x0+g.s,g.hw);put(cgPt((x0+x1)/2,g.hh),colName(j),"gxc")}
+    for(let i=0;i<g.nr;i++){const y0=g.hh-i*g.s,y1=Math.max(y0-g.s,-g.hh);put(cgPt(-g.hw,(y0+y1)/2),i+1,"gr")}
+  }
+  $("#cgInfo").textContent=`${g.nc} × ${g.nr} ช่อง · ${fmtU(CG.w)} × ${fmtU(CG.h)}`+g.warn;
+}
+function cgSync(){
+  document.querySelectorAll(".uu").forEach(e=>e.textContent=TOOL.unit==="M"?"m":TOOL.unit);
+  $("#cgForm").style.display=CG.on?"block":"none";
+  cgLockUi();
+  if(!CG.on)return;
+  ["#cgC","#cgW","#cgH","#cgS","#cgR"].forEach(i=>$(i).disabled=CG.locked);
+  const d=uD();
+  $("#cgC").value=fmtDDM(CG.c.lat,CG.c.lng);
+  $("#cgW").value=(CG.w/uF()).toFixed(d);$("#cgH").value=(CG.h/uF()).toFixed(d);$("#cgS").value=Math.round(CG.s);
+  $("#cgR").value=Math.round(CG.rot);$("#cgL").checked=CG.lab;
+}
+function cgSave(){DB.cg=CG.on?{on:true,c:{lat:CG.c.lat,lng:CG.c.lng},w:CG.w,h:CG.h,s:CG.s,rot:CG.rot,lab:CG.lab,locked:CG.locked}:null;save()}
+const CORN=[[-1,1],[1,1],[1,-1],[-1,-1]];
+function cgPlace(skip){
+  if(!cgHd)return;
+  const hw=CG.w/2,hh=CG.h/2;
+  CORN.forEach((k,i)=>{if(cgHd.k[i]!==skip)cgHd.k[i].setLatLng(cgPt(k[0]*hw,k[1]*hh))});
+  if(cgHd.c!==skip)cgHd.c.setLatLng(CG.c);
+  if(cgHd.r!==skip)cgHd.r.setLatLng(cgPt(0,hh+Math.max(CG.w,CG.h)*.12));
+}
+function cgMkHandles(){
+  gCGh.clearLayers();cgHd=null;
+  if(!CG.on||CG.locked)return;   // locked grid = no handles
+  const mk=(cls,html,sz)=>L.marker(CG.c,{draggable:true,zIndexOffset:1000,icon:L.divIcon({className:"",html:`<div class="cgh ${cls}">${html}</div>`,iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]})}).addTo(gCGh);
+  const after=m=>{cgDraw();cgPlace(m);cgSync()};
+  cgHd={k:CORN.map(([sx,sy])=>{
+    const m=mk("","",16);
+    m.on("drag",()=>{
+      const q=cgLocal(m.getLatLng()),ox=-sx*CG.w/2,oy=-sy*CG.h/2;
+      const nw=Math.max(10,Math.abs(q.x-ox)),nh=Math.max(10,Math.abs(q.y-oy));
+      const nc=cgPt((ox+(ox+sx*nw))/2,(oy+(oy+sy*nh))/2);
+      CG.c=nc;CG.w=nw;CG.h=nh;after(m);
+    }).on("dragend",()=>{cgPlace();cgSave()});
+    return m;
+  }),c:mk("c","✥",22),r:mk("r","⟳",22)};
+  cgHd.c.on("drag",()=>{CG.c=cgHd.c.getLatLng();after(cgHd.c)}).on("dragend",()=>{cgPlace();cgSave()});
+  cgHd.r.on("drag",()=>{CG.rot=(Math.round(brg(CG.c,cgHd.r.getLatLng()))%360+360)%360;after(cgHd.r)}).on("dragend",()=>{cgPlace();cgSave()});
+  cgPlace();
+}
+function cgRefresh(){cgDraw();cgSync();cgMkHandles()}
+const nice=v=>{const p=10**Math.floor(Math.log10(v)),f=v/p;return(f<1.5?1:f<3.5?2:f<7.5?5:10)*p};
+// --- draw the grid by dragging a rectangle over the map ---
+let cgDraw_=null;
+function cgCancelDraw(){
+  const D=cgDraw_;if(!D)return;
+  cgDraw_=null;
+  D.el.removeEventListener("pointerdown",D.down);D.el.removeEventListener("pointermove",D.move);
+  D.el.removeEventListener("pointerup",D.up);D.el.removeEventListener("pointercancel",D.up);
+  if(D.rect)map.removeLayer(D.rect);
+  map.dragging.enable();D.el.style.touchAction="";
+  map.getContainer().style.cursor="";$("#toast").style.display="none";
+  $("#cgNew").classList.remove("on");
+}
+function cgFromCorners(a,b){
+  const s=Math.min(a.lat,b.lat),n=Math.max(a.lat,b.lat),w=Math.min(a.lng,b.lng),e=Math.max(a.lng,b.lng);
+  const c=L.latLng((s+n)/2,(w+e)/2);
+  CG.on=true;CG.locked=false;CG.c=c;CG.rot=0;
+  CG.w=hav({lat:c.lat,lng:w},{lat:c.lat,lng:e});CG.h=hav({lat:s,lng:c.lng},{lat:n,lng:c.lng});
+  CG.s=200;   // default cell size 200 m (user-adjustable in whole hundreds of meters)
+  cgRefresh();cgSave();
+  toast("วาดกริดแล้ว — ลากมุมปรับขนาด · ✥ ย้าย · ⟳ หมุน · กด “ล็อกกริด” เมื่อพอใจ",4000);
+}
+$("#cgNew").onclick=()=>{
+  if(cgDraw_){cgCancelDraw();return}
+  if(CG.on&&CG.locked)return toast("กริดถูกล็อกอยู่ — ปลดล็อกก่อนจึงจะวาดใหม่ได้");
+  const el=map.getContainer(),D={el,rect:null,start:null};
+  const ll=e=>map.mouseEventToLatLng(e);
+  D.down=e=>{
+    if(e.target.closest&&e.target.closest(".leaflet-control,.leaflet-popup"))return;
+    D.start=ll(e);e.preventDefault();
+    try{el.setPointerCapture(e.pointerId)}catch(_){}
+    D.rect=L.rectangle([D.start,D.start],{color:"#00e5ff",weight:2,dashArray:"6 4",fillOpacity:.12,interactive:false}).addTo(map);
+  };
+  D.move=e=>{if(D.start&&D.rect)D.rect.setBounds(L.latLngBounds(D.start,ll(e)))};
+  D.up=e=>{
+    if(!D.start)return;
+    const a=D.start,b=ll(e),px=map.latLngToContainerPoint(a).distanceTo(map.latLngToContainerPoint(b));
+    cgCancelDraw();
+    if(px<30)return toast("ลากให้ใหญ่ขึ้นเพื่อวาดกริด");
+    cgFromCorners(a,b);
+  };
+  cgDraw_=D;
+  map.dragging.disable();el.style.cursor="crosshair";el.style.touchAction="none";
+  el.addEventListener("pointerdown",D.down);el.addEventListener("pointermove",D.move);
+  el.addEventListener("pointerup",D.up);el.addEventListener("pointercancel",D.up);
+  $("#cgNew").classList.add("on");
+  toast("ลากบนแผนที่เพื่อคลุมพื้นที่กริด (กดปุ่มอีกครั้งเพื่อยกเลิก)",0);
+};
+// --- lock / unlock (panel button + on-map button) ---
+let cgLockCtl=null;
+function cgLockUi(){
+  const t=CG.locked?"🔒 ปลดล็อกกริด":"🔓 ล็อกกริด";
+  $("#cgLock").textContent=t;
+  if(CG.on&&!cgLockCtl){
+    cgLockCtl=L.control({position:"topleft"});
+    cgLockCtl.onAdd=()=>{const b=L.DomUtil.create("button","cglock");L.DomEvent.disableClickPropagation(b);b.onclick=()=>cgToggleLock(true);return b};
+    cgLockCtl.addTo(map);
+  }
+  if(!CG.on&&cgLockCtl){cgLockCtl.remove();cgLockCtl=null}
+  if(cgLockCtl)cgLockCtl.getContainer().textContent=t;
+}
+function cgToggleLock(fromMap){
+  if(!CG.on)return toast("ยังไม่มีกริด — กด “ลากวาดกริด” ก่อน");
+  CG.locked=!CG.locked;
+  if(!CG.locked&&fromMap&&!(tab==="tools"&&TOOL.tab==="g")){openTab("tools");document.querySelector('#tTabs [data-tt=g]').click()}
+  cgMkHandles();cgSync();applyToolTab();cgSave();
+  toast(CG.locked?"ล็อกกริดแล้ว":"ปลดล็อกกริดแล้ว — ปรับได้อีกครั้ง",1800);
+}
+$("#cgLock").onclick=()=>cgToggleLock(false);
+$("#cgClr").onclick=()=>{cgCancelDraw();CG.on=false;CG.locked=false;gCG.clearLayers();gCGh.clearLayers();cgHd=null;cgSync();cgSave()};
+const cgIn=(id,fn)=>$(id).onchange=e=>{if(!CG.on||CG.locked)return;fn(e.target.value);cgDraw();cgSync();cgPlace();cgSave()};
+cgIn("#cgC",v=>{const ll=parseCoord(v);if(ll){CG.c=ll;map.panTo(ll)}else toast("พิกัดไม่ถูกต้อง เช่น N13 45.38 E100 30.10")});
+cgIn("#cgW",v=>{if(num(v)>0)CG.w=num(v)*uF()});
+cgIn("#cgH",v=>{if(num(v)>0)CG.h=num(v)*uF()});
+cgIn("#cgS",v=>{if(num(v)>0)CG.s=Math.max(100,Math.round(num(v)/100)*100)});   // snap to hundreds of meters
+cgIn("#cgR",v=>{CG.rot=((num(v)%360)+360)%360});
+$("#cgL").onchange=e=>{CG.lab=e.target.checked;cgDraw();cgSave()};
+try{if(DB.cg&&DB.cg.on){Object.assign(CG,DB.cg,{c:L.latLng(DB.cg.c.lat,DB.cg.c.lng)});CG.s=Math.max(100,Math.round(CG.s/100)*100);cgRefresh()}}catch(_){}
+
+/* ============ Import / Export KML & GPX ============ */
+function exportItems(){
+  const it=[];
+  if($("#xPoc").checked)DB.poc.forEach(p=>it.push({f:"POC",t:"p",n:p.name,d:[(POC_TYPES[p.type]||POC_TYPES.oth).n,p.district,p.contact&&"ผู้ประสานงาน: "+p.contact,p.phone&&"โทร "+p.phone,p.note].filter(Boolean).join(" | "),pts:[[p.lat,p.lng]]}));
+  if($("#xRt").checked){
+    DB.routes.forEach(r=>it.push({f:"Routes",t:"l",r:1,n:r.name,d:`${r.d.toFixed(1)} NM`,pts:r.wps.map(w=>[w.lat,w.lng,w.name])}));
+    if(DB.cur.wps.length>1)it.push({f:"Routes",t:"l",r:1,n:"แผนปัจจุบัน",pts:DB.cur.wps.map(w=>[w.lat,w.lng,w.name])});
+  }
+  if($("#xMeas").checked){
+    if(TOOL.pts.length>1)it.push({f:"Measure",t:"l",n:"เส้นวัด",pts:TOOL.pts.map(p=>[p.lat,p.lng])});
+    if(TOOL.c&&TOOL.e){const r=hav(TOOL.c,TOOL.e);it.push({f:"Measure",t:"g",n:"วงกลม R="+fmtD(r),pts:circlePts(TOOL.c.lat,TOOL.c.lng,r)});it.push({f:"Measure",t:"p",n:"ศูนย์กลางวงกลม",pts:[[TOOL.c.lat,TOOL.c.lng]]})}
+  }
+  if($("#xCg").checked){
+    const g=cgGeo();
+    if(g){
+      it.push({f:"Grid",t:"g",n:"Custom grid",d:`${g.nc}x${g.nr} cells, ${fmtU(CG.w)} x ${fmtU(CG.h)}, rot ${Math.round(CG.rot)}`,pts:g.outline.map(p=>[p.lat,p.lng])});
+      g.v.forEach((l,i)=>it.push({f:"Grid",t:"l",n:"col "+(i+1)+"|"+(i+2),pts:l.map(p=>[p.lat,p.lng])}));
+      g.h.forEach((l,i)=>it.push({f:"Grid",t:"l",n:"row "+(i+1)+"|"+(i+2),pts:l.map(p=>[p.lat,p.lng])}));
+    }
+  }
+  return it;
+}
+const xe=s=>String(s??"").replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+const stamp=()=>new Date().toISOString().slice(0,10).replace(/-/g,"");
+function toKML(items){
+  const co=pts=>pts.map(p=>`${(+p[1]).toFixed(6)},${(+p[0]).toFixed(6)},0`).join(" ");
+  const fold={};items.forEach(i=>(fold[i.f]=fold[i.f]||[]).push(i));
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Mission Prep ${stamp()}</name>
+<Style id="sl"><LineStyle><color>ff00d4ff</color><width>3</width></LineStyle></Style>
+<Style id="sg"><LineStyle><color>ffffe500</color><width>2</width></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+`+Object.entries(fold).map(([f,a])=>`<Folder><name>${xe(f)}</name>`+a.map(i=>`<Placemark><name>${xe(i.n)}</name>${i.d?`<description>${xe(i.d)}</description>`:""}`+
+    (i.t==="p"?`<Point><coordinates>${co(i.pts)}</coordinates></Point>`:
+     i.t==="l"?`<styleUrl>#sl</styleUrl><LineString><tessellate>1</tessellate><coordinates>${co(i.pts)}</coordinates></LineString>`:
+     `<styleUrl>#sg</styleUrl><Polygon><outerBoundaryIs><LinearRing><coordinates>${co(i.pts.concat([i.pts[0]]))}</coordinates></LinearRing></outerBoundaryIs></Polygon>`)+`</Placemark>`).join("")+`</Folder>`).join("\n")+`\n</Document></kml>`;
+}
+function toGPX(items){
+  const a=p=>`lat="${(+p[0]).toFixed(6)}" lon="${(+p[1]).toFixed(6)}"`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Mission Prep" xmlns="http://www.topografix.com/GPX/1/1">\n`+items.map(i=>{
+    if(i.t==="p")return `<wpt ${a(i.pts[0])}><name>${xe(i.n)}</name>${i.d?`<desc>${xe(i.d)}</desc>`:""}</wpt>`;
+    if(i.r)return `<rte><name>${xe(i.n)}</name>${i.d?`<desc>${xe(i.d)}</desc>`:""}${i.pts.map(p=>`<rtept ${a(p)}><name>${xe(p[2]||"")}</name></rtept>`).join("")}</rte>`;
+    const pts=i.t==="g"?i.pts.concat([i.pts[0]]):i.pts;
+    return `<trk><name>${xe(i.n)}</name>${i.d?`<desc>${xe(i.d)}</desc>`:""}<trkseg>${pts.map(p=>`<trkpt ${a(p)}></trkpt>`).join("")}</trkseg></trk>`;
+  }).join("\n")+`\n</gpx>`;
+}
+function doExport(kind){
+  const it=exportItems();
+  if(!it.length)return toast("ไม่มีข้อมูลให้ส่งออก");
+  if(kind==="kml")download(`mission_${stamp()}.kml`,toKML(it),"application/vnd.google-earth.kml+xml");
+  else download(`mission_${stamp()}.gpx`,toGPX(it),"application/gpx+xml");
+  toast(`ส่งออก ${it.length} รายการแล้ว`);
+}
+$("#xKml").onclick=()=>doExport("kml");
+$("#xGpx").onclick=()=>doExport("gpx");
+
+const kids=(el,n)=>[...el.children].filter(c=>c.localName===n);
+const kidTxt=(el,n)=>(kids(el,n)[0]?.textContent||"").trim();
+function parseKML(doc){
+  const F=[],cs=s=>s.trim().split(/\s+/).map(t=>t.split(",").map(Number)).filter(a=>a.length>=2&&isFinite(a[0]+a[1])).map(a=>[a[1],a[0]]);
+  for(const pm of doc.getElementsByTagName("Placemark")){
+    const n=kidTxt(pm,"name"),d=kidTxt(pm,"description").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
+    for(const c of pm.getElementsByTagName("coordinates")){
+      const par=c.parentNode.localName,pts=cs(c.textContent);
+      if(!pts.length)continue;
+      if(par==="Point")F.push({t:"p",n,d,pts:[pts[0]]});
+      else if(par==="LineString")F.push({t:"l",n,d,pts});
+      else if(par==="LinearRing"&&c.parentNode.parentNode.localName==="outerBoundaryIs")F.push({t:"g",n,d,pts});
+    }
+  }
+  return F;
+}
+function parseGPX(doc){
+  const F=[],ll=e=>[+e.getAttribute("lat"),+e.getAttribute("lon")],ok=p=>isFinite(p[0]+p[1]);
+  for(const w of doc.getElementsByTagName("wpt")){const p=ll(w);if(ok(p))F.push({t:"p",n:kidTxt(w,"name"),d:kidTxt(w,"desc"),pts:[p]})}
+  for(const r of doc.getElementsByTagName("rte")){const pts=[...r.getElementsByTagName("rtept")].map(ll).filter(ok);if(pts.length)F.push({t:"l",n:kidTxt(r,"name"),d:kidTxt(r,"desc"),pts})}
+  for(const t of doc.getElementsByTagName("trk"))for(const sg of t.getElementsByTagName("trkseg")){const pts=[...sg.getElementsByTagName("trkpt")].map(ll).filter(ok);if(pts.length)F.push({t:"l",n:kidTxt(t,"name"),d:kidTxt(t,"desc"),pts})}
+  return F;
+}
+const IMPC=["#ff9f1a","#3ddc84","#b56cff","#ff5c8a","#4dabff"];
+const impG={};
+DB.imp=DB.imp||[];
+function buildImp(l){
+  if(impG[l.id]){map.removeLayer(impG[l.id]);delete impG[l.id]}
+  if(!l.vis)return;
+  const g=L.layerGroup(),o=l.op,tip=f=>`<b>${esc(f.n||"(ไม่มีชื่อ)")}</b>${f.d?"<br><small>"+esc(f.d.slice(0,300))+"</small>":""}`;
+  l.feats.forEach(f=>{
+    let s;
+    if(f.t==="p")s=L.circleMarker(f.pts[0],{radius:6,color:"#fff",weight:2,fillColor:l.col,fillOpacity:o,opacity:o});
+    else if(f.t==="l")s=L.polyline(f.pts,{color:l.col,weight:3,opacity:o});
+    else s=L.polygon(f.pts,{color:l.col,weight:2,opacity:o,fillColor:l.col,fillOpacity:.25*o});
+    s.bindPopup(tip(f)).addTo(g);
+  });
+  g.addTo(map);impG[l.id]=g;
+}
+const impBounds=l=>L.latLngBounds(l.feats.flatMap(f=>f.pts));
+function renderImp(){
+  $("#impList").innerHTML=DB.imp.map(l=>`<div class="impc" data-id="${l.id}">
+    <div class="t"><label class="ck" style="margin:0!important"><input type="checkbox" data-v ${l.vis?"checked":""}> <span style="color:${l.col}">●</span> ${esc(l.name)}</label><span class="pill">${l.feats.length}</span></div>
+    <div class="row" style="margin-top:4px;flex-wrap:nowrap"><span style="font-size:11px;color:var(--mut);white-space:nowrap">โปร่งใส</span><input type="range" min="0" max="90" step="5" value="${Math.round((1-l.op)*100)}" data-o style="padding:0;min-height:22px;border:0"></div>
+    <div class="row" style="margin-top:4px"><button class="btn sm" data-z>🎯 ดู</button>${l.feats.some(f=>f.t==="p")?'<button class="btn sm" data-poc>จุด → POC</button>':""}<button class="btn sm bad" data-d>ลบ</button></div></div>`).join("")||`<div class="tl">ยังไม่มีเลเยอร์ที่นำเข้า</div>`;
+  $("#impList").querySelectorAll(".impc").forEach(box=>{
+    const l=DB.imp.find(x=>x.id===box.dataset.id);
+    box.querySelector("[data-v]").onchange=e=>{l.vis=e.target.checked;buildImp(l);save()};
+    box.querySelector("[data-o]").oninput=e=>{l.op=1-e.target.value/100;buildImp(l)};
+    box.querySelector("[data-o]").onchange=()=>save();
+    box.querySelector("[data-z]").onclick=()=>map.fitBounds(impBounds(l),{padding:[40,40],maxZoom:17});
+    const pb=box.querySelector("[data-poc]");
+    if(pb)pb.onclick=()=>{
+      const ps=l.feats.filter(f=>f.t==="p");
+      ps.forEach(f=>DB.poc.push({id:uid(),name:f.n||"จุดนำเข้า",type:"oth",lat:f.pts[0][0],lng:f.pts[0][1],note:f.d||""}));
+      save();drawPoc();if(tab==="poc")rPoc();toast(`เพิ่ม ${ps.length} จุดเป็น POC แล้ว`);
+    };
+    box.querySelector("[data-d]").onclick=()=>{if(confirm("ลบเลเยอร์นี้?")){if(impG[l.id])map.removeLayer(impG[l.id]);delete impG[l.id];DB.imp=DB.imp.filter(x=>x!==l);save();renderImp()}};
+  });
+}
+$("#iBtn").onclick=()=>{
+  const i=document.createElement("input");i.type="file";i.multiple=true;i.accept=".kml,.gpx,application/vnd.google-earth.kml+xml,application/gpx+xml,text/xml";
+  i.onchange=()=>[...i.files].forEach(f=>{
+    const r=new FileReader();
+    r.onload=()=>{
+      const doc=new DOMParser().parseFromString(r.result,"text/xml");
+      if(doc.getElementsByTagName("parsererror").length)return toast("อ่านไฟล์ไม่ได้: "+f.name);
+      const isGpx=doc.documentElement.localName==="gpx",feats=isGpx?parseGPX(doc):parseKML(doc);
+      if(!feats.length)return toast("ไม่พบข้อมูลพิกัดในไฟล์: "+f.name);
+      const l={id:uid(),name:f.name,vis:true,op:1,col:IMPC[DB.imp.length%IMPC.length],feats};
+      DB.imp.push(l);save();buildImp(l);renderImp();
+      map.fitBounds(impBounds(l),{padding:[40,40],maxZoom:17});toast(`นำเข้า ${feats.length} รายการจาก ${f.name}`);
+    };
+    r.readAsText(f);
+  });
+  i.click();
+};
+DB.imp.forEach(buildImp);renderImp();
+
+/* ============ Rain radar: RainViewer (animated tiles) + TMD (per-station images & national composite) ============ */
+// ported from AIP TH2/index.html
+const RAIN={A:null,B:null,act:"A",frames:[],idx:0,playing:true,timer:null,fetched:0,op:.6,busy:false,on:false};
+const rainUrl=f=>`${f.host}${f.path}/512/{z}/{x}/{y}/2/1_1.png`;   // RainViewer native max zoom is 7; 512px tiles + zoomOffset:-1 give one extra level
+async function rainFetch(force){
+  if(!force&&RAIN.frames.length&&Date.now()-RAIN.fetched<3e5)return;
+  const r=await fetch("https://api.rainviewer.com/public/weather-maps.json");
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  const j=await r.json(),mp=k=>(j.radar?.[k]||[]).map(f=>({time:f.time,host:j.host,path:f.path,kind:k}));
+  RAIN.frames=[...mp("past"),...mp("nowcast")];RAIN.fetched=Date.now();
+}
+function rainLabel(f){
+  const m=Math.round((f.time*1000-Date.now())/6e4);
+  return f.kind==="nowcast"?`พยากรณ์ +${m} นาที`:Math.abs(m)<=2?"ล่าสุด (เมื่อครู่)":`${Math.abs(m)} นาทีที่แล้ว`;
+}
+function rainHud(){
+  const f=RAIN.frames[RAIN.idx];
+  $("#rainLbl").textContent=f?rainLabel(f):"⏳ กำลังโหลด…";
+  $("#rainPlay").textContent=RAIN.playing?"⏸":"▶";
+}
+function rainShow(i){
+  return new Promise(res=>{
+    const f=RAIN.frames[i];if(!f)return res();
+    RAIN.idx=i;
+    const hn=RAIN.act==="A"?"B":"A",hid=RAIN[hn],vis=RAIN[RAIN.act];
+    if(!hid)return res();
+    RAIN.busy=true;let done=false;
+    const fin=()=>{if(done)return;done=true;hid.off("load",fin);hid.setOpacity(RAIN.op);if(vis)vis.setOpacity(0);RAIN.act=hn;RAIN.busy=false;rainHud();res()};
+    hid.on("load",fin);hid.setUrl(rainUrl(f));setTimeout(fin,2000);
+  });
+}
+async function rainTick(){
+  if(!RAIN.frames.length||RAIN.busy)return;
+  const n=(RAIN.idx+1)%RAIN.frames.length;
+  if(n===0&&Date.now()-RAIN.fetched>6e5){try{await rainFetch(true);RAIN.idx=-1}catch(_){}}
+  rainShow((RAIN.idx+1)%RAIN.frames.length);
+}
+async function rainStart(){
+  if(RAIN.A)return;
+  const o={opacity:0,zIndex:450,tileSize:512,zoomOffset:-1,maxNativeZoom:8,maxZoom:23,attribution:"Radar © RainViewer"};
+  RAIN.A=L.tileLayer("",o).addTo(map);RAIN.B=L.tileLayer("",o).addTo(map);
+  [RAIN.A,RAIN.B].forEach(l=>{const c=l.getContainer&&l.getContainer();if(c)c.style.transition="opacity 350ms linear"});
+  RAIN.act="A";rainHud();
+  try{
+    await rainFetch(true);
+    if(!RAIN.on)return;
+    await rainShow(RAIN.frames.length-1);
+    RAIN.playing=true;rainHud();
+    RAIN.timer=setInterval(rainTick,600);
+  }catch(e){
+    $("#lyRain").checked=false;rainSet(false);
+    toast("โหลดเรดาร์ RainViewer ไม่ได้ (ต้องใช้อินเทอร์เน็ต)");
+  }
+}
+function rainStop(){
+  clearInterval(RAIN.timer);RAIN.timer=null;
+  ["A","B"].forEach(k=>{if(RAIN[k]){map.removeLayer(RAIN[k]);RAIN[k]=null}});
+  RAIN.act="A";RAIN.busy=false;
+}
+function rainSet(on){
+  RAIN.on=on;$("#rainCtl").style.display=on?"block":"none";
+  on?rainStart():rainStop();
+}
+$("#lyRain").onchange=e=>rainSet(e.target.checked);
+$("#rainPlay").onclick=()=>{
+  RAIN.playing=!RAIN.playing;
+  if(RAIN.playing){if(!RAIN.timer)RAIN.timer=setInterval(rainTick,600)}else{clearInterval(RAIN.timer);RAIN.timer=null}
+  rainHud();
+};
+$("#rainOp").oninput=e=>{RAIN.op=1-e.target.value/100;const v=RAIN[RAIN.act];if(v)v.setOpacity(RAIN.op)};
+
+/* --- TMD --- */
+const TMD_STATIONS=[
+  {code:'mhs',name:'Mae Hong Son',     lat:19.3017,lon:97.9750, cal:{bounds:[[16.646718,95.427246],[21.698265,100.371094]]}},
+  {code:'cri',name:'Chiang Rai',       lat:19.9524,lon:99.8829},
+  {code:'lmp',name:'Lamphun',          lat:18.5744,lon:99.0087, cal:{bounds:[[16.225224,96.558838],[20.848545,101.304932]]}},
+  {code:'tak',name:'Doi Muser (Tak)',  lat:16.8960,lon:99.2537, cal:{bounds:[[14.466596,96.196289],[19.093267,101.810303]]}},
+  {code:'phs',name:'Phitsanulok',      lat:16.7830,lon:100.2791, cal:{bounds:[[14.376472,97.582789],[19.114029,102.480469]]}},
+  {code:'phb',name:'Phetchabun',       lat:16.6760,lon:101.1951, cal:{cx:0.3761,cy:0.4651,rH:0.5009}},
+  {code:'kkn',name:'Khon Kaen',        lat:16.4667,lon:102.7836, cal:{bounds:[[14.040673,100.074463],[18.788125,105.021895]]}},
+  {code:'skn',name:'Sakon Nakhon',     lat:17.1951,lon:104.1186, cal:{bounds:[[14.753635,101.337891],[19.435514,106.402588]]}},
+  {code:'ubn',name:'Ubon Ratchathani', lat:15.2513,lon:104.8702, cal:{bounds:[[13.036669,102.249756],[17.455473,107.457275]]}},
+  {code:'srn',name:'Surin',            lat:14.8818,lon:103.4936, cal:{bounds:[[12.715368,100.854492],[17.004262,106.116943]]}},
+  {code:'skm',name:'Samut Songkhram',  lat:13.4098,lon:100.0022, cal:{bounds:[[10.97355,97.437744],[15.749963,102.194824]]}},
+  {code:'svp',name:'Suvarnabhumi',     lat:13.6858,lon:100.7489, cal:{bounds:[[11.523088,98.173828],[15.792254,103.326416]]}},
+  {code:'ryg',name:'Rayong',           lat:12.6797,lon:101.0050, cal:{bounds:[[10.432552,99.146118],[14.785456,105.095215]]}},
+  {code:'cmp',name:'Chumphon',         lat:10.7112,lon:99.3617, cal:{bounds:[[8.331083,96.416016],[12.618897,101.876221]]}},
+  {code:'srt',name:'Surat Thani',      lat:9.1361, lon:99.1390, cal:{bounds:[[6.67552,96.536865],[11.490791,101.326904]]}},
+  {code:'rng',name:'Ranong',           lat:9.7776, lon:98.5855, cal:{bounds:[[7.547656,96.421509],[12.136005,102.030029]]}},
+  {code:'pkt',name:'Phuket',           lat:8.1125, lon:98.3092, cal:{bounds:[[5.889261,95.844727],[10.31575,100.552368]]}},
+  {code:'trg',name:'Trang',            lat:7.5086, lon:99.6158, cal:{bounds:[[5.36446,97.470703],[9.654908,103.139648]]}},
+  {code:'hyi',name:'Hat Yai',          lat:6.9328, lon:100.3950, cal:{bounds:[[4.66403,97.987061],[9.091249,102.645264]]},
+   urlFn:()=>`https://weather.tmd.go.th/hyi/hyiLoop.gif?_=${Date.now()}`},
+  {code:'stp',name:'Sathing Phra',     lat:7.4667, lon:100.4000, cal:{bounds:[[5.287887,98.22876],[9.60075,102.678223]]}},
+  {code:'nrt',name:'Narathiwat',       lat:6.5178, lon:101.7425, cal:{bounds:[[4.247812,99.239502],[8.581021,104.359131]]}},
+  {code:'kkw',name:'Nakhon Nayok (Khao Khiao)',lat:14.2069,lon:101.2130, cal:{bounds:[[12.200442,98.833008],[16.425548,103.897705]]},
+   urlFn:()=>`https://weather.tmd.go.th/kkw/kkwLoop.gif?_=${Date.now()}`},
+  {code:'tkl',name:'Takhli (Nakhon Sawan)',lat:15.2773,lon:100.2959,noLoop:true,cal:{bounds:[[13.090179,98.140869],[17.37161,103.743896]]},
+   urlFn:()=>`https://weather.tmd.go.th/tkl/tkl240_latest.png?_=${Date.now()}`},
+  {code:'omk',name:'Omkoi (Chiang Mai)',lat:17.7961,lon:98.4067,noLoop:true,cal:{cx:0.373,cy:0.5,rH:0.5},
+   urlFn:()=>`https://weather.tmd.go.th/omk/omk240_latest.png?_=${Date.now()}`},
+  {code:'pmi',name:'Phimai (Nakhon Ratchasima)',lat:15.2186,lon:102.4928,noLoop:true,cal:{bounds:[[13.012586,100.340881],[17.266728,105.699463]]},
+   urlFn:()=>`https://weather.tmd.go.th/pmi/pmi240_latest.png?_=${Date.now()}`},
+  {code:'bmanc',name:'Bangkok – Nong Chok',lat:13.8547,lon:100.8372,cal:{bounds:[[12.747516,99.53064],[14.897013,102.145386]]},
+   urlFn:()=>`https://weather.tmd.go.th/pic_bmancLoop.gif?_=${Date.now()}`},
+  {code:'bmank',name:'Bangkok – Nong Khaem',lat:13.6975,lon:100.3539,cal:{bounds:[[12.645698,99.047241],[14.827991,101.651001]]},
+   urlFn:()=>`https://weather.tmd.go.th/pic_bmankLoop.gif?_=${Date.now()}`}
+];
+const TMD_RANGE_KM=240,TMD_REFRESH=300000,TMD_CAL={cx:.546,cy:.491,rH:.456};
+const tmdImgUrl=(st,ext)=>st.urlFn?st.urlFn():`https://weather.tmd.go.th/${st.code}/${st.code}loop.${ext}?_=${Date.now()}`;
+function tmdBounds(lat,lon,w,h,cal){
+  if(cal&&cal.bounds)return L.latLngBounds(cal.bounds[0],cal.bounds[1]);
+  const c=cal||TMD_CAL,W=w||1,H=h||1,k=TMD_RANGE_KM/(c.rH*H),cl=Math.cos(lat*Math.PI/180);
+  const l=c.cx*W,t=c.cy*H;
+  return L.latLngBounds([lat-(H-t)*k/111.32,lon-l*k/(111.32*cl)],[lat+t*k/111.32,lon+(W-l)*k/(111.32*cl)]);
+}
+const gTmd=L.layerGroup(),tmdOv={},tmdMk={};
+const tmdIcon=a=>L.divIcon({html:`<div class="tmd-radar-marker${a?" active":""}">📡</div>`,iconSize:[26,26],iconAnchor:[13,13],className:""});
+let tmdOp=.65;
+function tmdList(){
+  const k=Object.keys(tmdOv);
+  $("#tmdList").innerHTML=k.map(c=>`<div class="trow"><span>${esc(tmdOv[c].st.name)}${tmdOv[c].st.noLoop?" (ภาพนิ่ง)":""}</span><i data-x="${c}" title="ซ่อน">✕</i></div>`).join("");
+  $("#tmdList").querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>tmdRemove(b.dataset.x));
+}
+function tmdAdd(st){
+  const ov=L.imageOverlay(tmdImgUrl(st,"gif"),tmdBounds(st.lat,st.lon,800,800,st.cal),{opacity:tmdOp,interactive:false,zIndex:440}).addTo(map);
+  const rec={ov,st,ext:"gif",timer:null};
+  ov.on("error",()=>{if(!st.urlFn&&rec.ext==="gif"&&tmdOv[st.code]){rec.ext="jpg";ov.setUrl(tmdImgUrl(st,"jpg"))}});
+  const img=ov.getElement();
+  if(img)img.addEventListener("load",()=>{if(tmdOv[st.code])ov.setBounds(tmdBounds(st.lat,st.lon,img.naturalWidth,img.naturalHeight,st.cal))});
+  rec.timer=setInterval(()=>{if(tmdOv[st.code])ov.setUrl(tmdImgUrl(st,rec.ext))},TMD_REFRESH);
+  tmdOv[st.code]=rec;tmdMk[st.code].setIcon(tmdIcon(true));tmdList();
+}
+function tmdRemove(code){
+  const r=tmdOv[code];if(!r)return;
+  clearInterval(r.timer);map.removeLayer(r.ov);delete tmdOv[code];tmdMk[code].setIcon(tmdIcon(false));tmdList();
+}
+TMD_STATIONS.forEach(st=>{
+  const m=L.marker([st.lat,st.lon],{icon:tmdIcon(false)}).bindTooltip(st.name,{direction:"top",offset:[0,-10]});
+  m.on("click",()=>tmdOv[st.code]?tmdRemove(st.code):tmdAdd(st));
+  tmdMk[st.code]=m;gTmd.addLayer(m);
+});
+$("#lyTmd").onchange=e=>{
+  $("#tmdCtl").style.display=e.target.checked?"block":"none";
+  if(e.target.checked){map.addLayer(gTmd);tmdList()}
+  else{Object.keys(tmdOv).forEach(tmdRemove);map.removeLayer(gTmd)}
+};
+$("#tmdOp").oninput=e=>{tmdOp=1-e.target.value/100;Object.values(tmdOv).forEach(r=>r.ov.setOpacity(tmdOp))};
+$("#tmdOp").value=35;
+
+// nationwide composite — exact bounds from TMD's own radar monitor config
+const TMDC={url:"https://weather.tmd.go.th/composite/images/zr/00.png",bounds:L.latLngBounds([4,95],[22.5,108])};
+let tmdcOv=null,tmdcTimer=null,tmdcOp=.6;
+$("#lyTmdC").onchange=e=>{
+  $("#tmdcCtl").style.display=e.target.checked?"block":"none";
+  if(e.target.checked){
+    tmdcOv=L.imageOverlay(TMDC.url+"?_="+Date.now(),TMDC.bounds,{opacity:tmdcOp,interactive:false,zIndex:435}).addTo(map);
+    tmdcTimer=setInterval(()=>tmdcOv&&tmdcOv.setUrl(TMDC.url+"?_="+Date.now()),TMD_REFRESH);
+  }else{clearInterval(tmdcTimer);tmdcTimer=null;if(tmdcOv){map.removeLayer(tmdcOv);tmdcOv=null}}
+};
+$("#tmdcOp").oninput=e=>{tmdcOp=1-e.target.value/100;if(tmdcOv)tmdcOv.setOpacity(tmdcOp)};
+
+/* ============ AIP data (VTBL · VTBK · VTBD · VTBS) + METAR / TAF ============ */
+// ported from AIP TH2/index.html (airports, navAids, METAR/TAF fetch + decoder)
+const AIRAC="2026-09-03";
+const AIP_AD=[
+  {icao:"VTBL",name:"Lop Buri / Khok Kathiam Air Force Base",          city:"Lop Buri",      lat:14.8746,lon:100.6634,elev:"133 ft",op:"RTAF"},
+  {icao:"VTBK",name:"Nakhon Pathom / Kamphaeng Saen Airport",          city:"Nakhon Pathom", lat:14.1020,lon:99.9173, elev:"32 ft", op:"RTAF"},
+  {icao:"VTBD",name:"Bangkok / Don Mueang International Airport",      city:"Bangkok",       lat:13.9144,lon:100.6057,elev:"9 ft",  op:"AOT"},
+  {icao:"VTBS",name:"Bangkok / Suvarnabhumi International Airport",    city:"Bangkok",       lat:13.6858,lon:100.7489,elev:"8 ft",  op:"AOT"}
+];
+const AIP_OPC={AOT:"#0ea5e9",RTAF:"#ef4444"};
+const AIP_NAV=[
+  {id:'BKKT',name:'Bangkok',       type:'DVOR/DME',freq:'117.7 MHz',ch:'CH 124X',lat:13.8936,lon:100.5961,elev:'16 m',ap:'VTBD'},
+  {id:'IBKK',name:'Don Mueang ILS RWY 21R',type:'ILS',cat:'CAT II',freq:'109.3 MHz',ch:'CH 30X',lat:13.8946,lon:100.5946,elev:'2 m',ap:'VTBD',rwy:'21R'},
+  {id:'IDMG',name:'Don Mueang ILS RWY 21L',type:'ILS',cat:'CAT I', freq:'110.3 MHz',ch:'CH 40X',lat:13.8977,lon:100.6005,elev:'2 m',ap:'VTBD',rwy:'21L'},
+  {id:'IBKD',name:'Don Mueang ILS RWY 03L',type:'ILS',cat:'CAT I', freq:'109.7 MHz',ch:'CH 34X',lat:13.9288,lon:100.6138,elev:'2 m',ap:'VTBD',rwy:'03L'},
+  {id:'SVB', name:'Suvarnabhumi',  type:'DVOR/DME',freq:'111.4 MHz',ch:'CH 51X', lat:13.6590,lon:100.7315,elev:'2 m',ap:'VTBS'},
+  {id:'ISWS',name:'Suvarnabhumi ILS RWY 02R',type:'ILS',cat:'CAT II',freq:'109.1 MHz',ch:'CH 28X',lat:13.7062,lon:100.7438,elev:'2 m',ap:'VTBS',rwy:'02R'},
+  {id:'ISWN',name:'Suvarnabhumi ILS RWY 20L',type:'ILS',cat:'CAT II',freq:'109.5 MHz',ch:'CH 32X',lat:13.6688,lon:100.7339,elev:'2 m',ap:'VTBS',rwy:'20L'},
+  {id:'ISES',name:'Suvarnabhumi ILS RWY 01', type:'ILS',cat:'CAT II',freq:'110.1 MHz',ch:'CH 38X',lat:13.6943,lon:100.7617,elev:'2 m',ap:'VTBS',rwy:'01'},
+  {id:'ISEN',name:'Suvarnabhumi ILS RWY 19', type:'ILS',cat:'CAT II',freq:'110.5 MHz',ch:'CH 42X',lat:13.6541,lon:100.7501,elev:'2 m',ap:'VTBS',rwy:'19'},
+  {id:'KPS', name:'Kamphaeng Saen',type:'DVOR/DME',freq:'114.5 MHz',ch:'CH 92X', lat:14.1656,lon:99.9542, elev:'20 m',ap:'VTBK'},
+  {id:'LB',  name:'Lop Buri NDB',            type:'NDB',             freq:'280 kHz',  ch:'',        lat:14.8767,lon:100.6573,elev:'40 m',ap:'VTBL'},
+  {id:'LOB', name:'Lop Buri TACAN',          type:'TACAN',           freq:'CH 115X',  ch:'CH 115X', lat:14.8762,lon:100.6599,elev:'40 m',ap:'VTBL'},
+  {id:'ILO', name:'Lop Buri ILS RWY 05 LOC', type:'ILS',cat:'CAT I', freq:'108.3 MHz',ch:'CH 20X',  lat:14.8796,lon:100.6688,elev:'40 m',ap:'VTBL',rwy:'05'},
+  {id:'ILO-GP',name:'Lop Buri ILS RWY 05 GP',type:'ILS',cat:'CAT I', freq:'334.1 MHz',ch:'CH 20X',  lat:14.8705,lon:100.6605,elev:'40 m',ap:'VTBL',rwy:'05'},
+  {id:'ILO-MM',name:'Lop Buri ILS MM RWY 05', type:'ILS',cat:'MM',   freq:'75 MHz',   ch:'',        lat:14.8619,lon:100.6501,elev:'40 m',ap:'VTBL',rwy:'05'}
+];
+const aipUrl=i=>`https://aip.caat.or.th/${AIRAC}-AIRAC/html/eAIP/VT-AD-2.${i}-en-GB.html`;
+const navOf=i=>AIP_NAV.filter(n=>n.ap===i);
+const navTxt=n=>`${n.type}${n.cat&&n.type!=="ILS"?" "+n.cat:""} · ${n.freq}${n.ch&&n.ch!==n.freq?" · "+n.ch:""}`;
+const navRows=i=>navOf(i).map(n=>`<div class="navr"><span>${esc(n.id)} — ${esc(n.name)}${n.type==="ILS"&&n.cat?" ("+esc(n.cat)+")":""}</span><span>${esc(n.freq)}</span></div>`).join("");
+const NAVC={"DVOR/DME":"#0ea5e9",ILS:"#22c55e",NDB:"#f59e0b",TACAN:"#a855f7"};
+
+/* --- weather fetch (RTAF API → VATSIM METAR → NOAA TAF fallbacks; all best-effort, CORS permitting) --- */
+const RTAF_MAP={VTBL:"VTML",VTBK:"VTMK",VTBD:"VTMD"};   // RTAF stations report under a different ID
+const RTAF_M={},RTAF_T={},WXC={};let RTAF_TS=0;
+async function fetchRTAF(){
+  if(Date.now()-RTAF_TS<6e5&&Object.keys(RTAF_M).length)return;
+  await Promise.all([
+    fetch("https://weather.rtaf.mi.th/api/v1/metar/desktop/getMetarAllStationJSON",{method:"POST"}).then(r=>r.text()).then(t=>{
+      (JSON.parse(t.trim()).CURRENT_WEATHER||[]).filter(s=>s.STATION_CODE&&s.METAR&&s.METAR!=="NIL").forEach(s=>RTAF_M[s.STATION_CODE.toUpperCase()]=s.METAR)}).catch(()=>{}),
+    fetch("https://weather.rtaf.mi.th/api/v1/taf/desktop/getTafJSON",{method:"POST"}).then(r=>r.text()).then(t=>{
+      (JSON.parse(t.trim()).currentTaf||[]).filter(s=>s.stationCode&&s.main?.tafString).forEach(s=>RTAF_T[s.stationCode]=s.main.tafString)}).catch(()=>{})
+  ]);
+  RTAF_TS=Date.now();
+}
+async function wxFetch(icao){
+  const c=WXC[icao];if(c&&Date.now()-c.ts<6e5)return c;
+  let metar=null,taf=null,dec=null;
+  const st=RTAF_MAP[icao];
+  if(st){await fetchRTAF().catch(()=>{});metar=RTAF_M[st]||null;taf=RTAF_T[st]||null}
+  const tasks=[];
+  if(!metar)tasks.push(fetch(`https://metar.vatsim.net/metar.php?id=${icao}`).then(r=>r.text()).then(t=>{const l=t.trim().split("\n").find(x=>x.trim().startsWith(icao));if(l)metar=l.trim()}).catch(()=>{}));
+  if(!taf)tasks.push(fetch(`https://aviationweather.gov/api/data/taf?ids=${icao}&format=json&time=valid&hours=24`).then(r=>r.json()).then(d=>{if(Array.isArray(d)&&d[0]?.rawTAF)taf=d[0].rawTAF}).catch(()=>{}));
+  tasks.push(fetch(`https://aviationweather.gov/api/data/metar?ids=${icao}&format=json&hours=2`).then(r=>r.json()).then(d=>{if(Array.isArray(d)&&d[0])dec=d[0]}).catch(()=>{}));
+  await Promise.all(tasks);
+  return WXC[icao]={metar,taf,dec,ts:Date.now()};
+}
+
+/* --- METAR decoder --- */
+function parseMETAR(raw){
+  const p={windDir:null,windSpd:null,windGust:null,windVrb:false,vis:null,visStr:"—",cavok:false,wx:[],clouds:[],temp:null,dewp:null,qnh:null};
+  const wm=raw.match(/\b(VRB|\d{3})(\d{2,3})(?:G(\d{2,3}))?KT\b/);
+  if(wm){p.windVrb=wm[1]==="VRB";p.windDir=p.windVrb?null:+wm[1];p.windSpd=+wm[2];p.windGust=wm[3]?+wm[3]:null}
+  p.cavok=/\bCAVOK\b/.test(raw);
+  if(!p.cavok){const vm=raw.match(/(?:^|\s)(\d{4})(?:\s|$)/);if(vm){p.vis=+vm[1];p.visStr=p.vis>=9999?"10+ km":(p.vis/1000).toFixed(1)+" km"}}else p.visStr="10+ km";
+  const wxm=raw.match(/\b([+\-]?(?:VC)?(?:MI|PR|BC|DR|BL|SH|TS|FZ)?(?:DZ|RA|SN|SG|IC|PL|GR|GS|UP)?(?:BR|FG|FU|VA|DU|SA|HZ|PO|SQ|FC|SS|DS))\b/g);
+  if(wxm)p.wx=[...new Set(wxm)].filter(w=>/[A-Z]{2}/.test(w)).slice(0,3);
+  const cr=/\b(FEW|SCT|BKN|OVC)(\d{3})(CB|TCU)?\b/g;let cm;
+  while((cm=cr.exec(raw)))p.clouds.push({cover:cm[1],base:+cm[2]*100,cb:cm[3]||null});
+  const tm=raw.match(/\b(M?\d{2})\/(M?\d{2})\b/);if(tm){p.temp=+tm[1].replace("M","-");p.dewp=+tm[2].replace("M","-")}
+  const qm=raw.match(/\bQ(\d{4})\b/),am=raw.match(/\bA(\d{4})\b/);   // Q = hPa, A = inHg×100 (RTAF METARs use A)
+  if(qm)p.qnh=+qm[1];else if(am)p.qnh=Math.round(+am[1]/100*33.8639);
+  return p;
+}
+function calcFC(p){
+  if(!p)return"UNKN";if(p.cavok)return"VFR";
+  const ceil=p.clouds.filter(c=>["BKN","OVC"].includes(c.cover)).map(c=>c.base)[0]??Infinity,vis=p.vis??0;
+  return ceil<500||vis<1600?"LIFR":ceil<1000||vis<4800?"IFR":ceil<3000||vis<8000?"MVFR":"VFR";
+}
+const FC_COLOR={VFR:"#22c55e",MVFR:"#3b82f6",IFR:"#ef4444",LIFR:"#a855f7",UNKN:"#6b7b8d"};
+let _cg=0;
+function windSVG(dir,spd,gust,vrb){
+  const CX=100,CY=100,R=82,id="cBg"+(++_cg);let tk="",lb="",ar="";
+  for(let d=0;d<360;d+=10){
+    const crd=d%90===0,maj=d%30===0,len=crd?13:maj?8:4,a=(d-90)*Math.PI/180;
+    tk+=`<line x1="${(CX+(R-len)*Math.cos(a)).toFixed(1)}" y1="${(CY+(R-len)*Math.sin(a)).toFixed(1)}" x2="${(CX+R*Math.cos(a)).toFixed(1)}" y2="${(CY+R*Math.sin(a)).toFixed(1)}" stroke="rgba(255,255,255,${crd?.95:maj?.6:.3})" stroke-width="${crd?1.8:maj?1:.7}"/>`;
+  }
+  for(let d=0;d<360;d+=30){
+    const crd=d%90===0,a=(d-90)*Math.PI/180,t=d===0?"N":d===90?"E":d===180?"S":d===270?"W":String(d/10).padStart(2,"0");
+    lb+=`<text x="${(CX+(R-20)*Math.cos(a)).toFixed(1)}" y="${(CY+(R-20)*Math.sin(a)).toFixed(1)}" text-anchor="middle" dominant-baseline="central" fill="${crd?"#fff":"rgba(255,255,255,.78)"}" font-size="${crd?11:8}" font-weight="${crd?700:400}">${t}</text>`;
+  }
+  if(vrb)ar=`<circle cx="${CX}" cy="${CY}" r="18" fill="none" stroke="white" stroke-width="2" stroke-dasharray="5,3"/><text x="${CX}" y="${CY}" text-anchor="middle" dominant-baseline="central" fill="white" font-size="9" font-weight="700">VRB</text>`;
+  else if(dir!==null&&spd>0){
+    const a=(dir-90)*Math.PI/180,L=R-28,ax=CX+L*Math.cos(a),ay=CY+L*Math.sin(a),hs=9,pp=a+Math.PI/2;
+    const h=s=>`${(CX+(L-hs)*Math.cos(a)+s*hs*.5*Math.cos(pp)).toFixed(2)},${(CY+(L-hs)*Math.sin(a)+s*hs*.5*Math.sin(pp)).toFixed(2)}`;
+    ar=`<line x1="${CX}" y1="${CY}" x2="${ax.toFixed(2)}" y2="${ay.toFixed(2)}" stroke="white" stroke-width="2.8" stroke-linecap="round"/><polygon points="${ax.toFixed(2)},${ay.toFixed(2)} ${h(1)} ${h(-1)}" fill="white"/><circle cx="${CX}" cy="${CY}" r="4" fill="white"/>`;
+  }else ar=`<circle cx="${CX}" cy="${CY}" r="10" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="2"/><text x="${CX}" y="${CY}" text-anchor="middle" dominant-baseline="central" fill="rgba(255,255,255,.8)" font-size="8">CALM</text>`;
+  const wt=vrb?`VRB / ${spd} kt`:spd===0?"CALM":`${String(dir??0).padStart(3,"0")}°  ${spd} kt${gust?` G${gust}`:""}`;
+  return `<svg viewBox="0 0 200 200" style="width:100%;max-width:180px;display:block;margin:2px auto 0"><defs><radialGradient id="${id}" cx="40%" cy="35%" r="65%"><stop offset="0%" stop-color="#1e7dd4"/><stop offset="100%" stop-color="#0c3d77"/></radialGradient></defs>
+    <circle cx="${CX}" cy="${CY}" r="${R+2}" fill="url(#${id})" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/><circle cx="${CX}" cy="${CY}" r="${R-25}" fill="none" stroke="rgba(255,255,255,.08)"/>
+    ${tk}${lb}${ar}<text x="${CX}" y="192" text-anchor="middle" fill="white" font-size="11" font-weight="700">${wt}</text></svg>`;
+}
+function wxWidget(metar,d){
+  const p=parseMETAR(metar);
+  const dir=d?.wdir??p.windDir,spd=d?.wspd??p.windSpd??0,gust=d?.wgst??p.windGust;
+  const vrb=(dir===null&&spd>0)||(metar.includes("VRB")&&dir===null);
+  const temp=d?.temp??p.temp,dewp=d?.dewp??p.dewp,qnh=d?.altim?Math.round(d.altim*33.8639):p.qnh;
+  let vis=p.visStr;if(d&&d.visib!=null){const sm=parseFloat(d.visib);vis=isNaN(sm)||sm>=6?"10+ km":(sm*1.60934).toFixed(1)+" km"}
+  const clouds=p.clouds,cat=d?.fltCat??calcFC(p),col=FC_COLOR[cat]||FC_COLOR.UNKN;
+  const ce=(()=>{const b=clouds.find(c=>["BKN","OVC"].includes(c.cover))||clouds.find(c=>c.cover==="SCT")||clouds.find(c=>c.cover==="FEW");return b?`${b.cover} ${b.base.toLocaleString()}ft`:vis==="10+ km"?"CAVOK / SKC":"SKC"})();
+  return `<div class="wxs"><div class="row2"><span class="fc" style="background:${col}">${cat}</span><span>👁 ${vis}</span><span>☁ ${ce}</span>${p.wx.length?`<b style="color:#f59e0b">${p.wx.join(" ")}</b>`:""}${temp!==null?`<span style="margin-left:auto">🌡 ${temp}°C${dewp!==null?" / DP "+dewp+"°C":""}</span>`:""}</div>
+    ${windSVG(dir,spd,gust,vrb)}${qnh?`<div style="text-align:center;font-size:11px;color:var(--mut)">QNH ${qnh} hPa</div>`:""}</div>`;
+}
+function metarAge(raw){   // minutes since the DDHHMMZ group; null if unparsable
+  const m=raw.match(/\b(\d{2})(\d{2})(\d{2})Z\b/);if(!m)return null;
+  const n=new Date();let t=Date.UTC(n.getUTCFullYear(),n.getUTCMonth(),+m[1],+m[2],+m[3]);
+  if(t>n.getTime()+36e5)t=Date.UTC(n.getUTCFullYear(),n.getUTCMonth()-1,+m[1],+m[2],+m[3]);
+  return Math.round((n.getTime()-t)/6e4);
+}
+const fmtTAF=t=>esc(t).replace(/\s+(BECMG|TEMPO|FM\d{6}|PROB\d{2})/g,"\n  $1");
+async function wxInto(el,icao,force){
+  if(force){delete WXC[icao];RTAF_TS=0;for(const k in RTAF_M)delete RTAF_M[k];for(const k in RTAF_T)delete RTAF_T[k]}
+  el.innerHTML=`<div class="wxr na">⏳ กำลังโหลด METAR / TAF…</div>`;
+  try{
+    const r=await wxFetch(icao);
+    const age=r.metar?metarAge(r.metar):null;
+    const [cls,lab]=!r.metar?["bad","✕ ไม่พบข้อมูล"]:age===null?["ok","✓ Live"]:age<=90?["ok","✓ ล่าสุด"]:["warn","⚠ เก่า"];
+    el.innerHTML=`<div class="wxh"><b>🌤 METAR / TAF</b><span class="pill ${cls}">${lab}</span><span class="wxt">${age!==null&&r.metar?(age<60?age+" นาทีที่แล้ว":Math.round(age/60)+" ชม.ที่แล้ว"):""}</span><button class="btn sm" data-rf title="รีเฟรช">↻</button></div>`+
+      `<div class="wxl">METAR</div><div class="wxr${r.metar?"":" na"}">${r.metar?esc(r.metar):"ไม่พบ METAR"}</div>`+
+      `<div class="wxl">TAF</div><div class="wxr${r.taf?"":" na"}">${r.taf?fmtTAF(r.taf):"ไม่พบ TAF"}</div>`+
+      (!r.metar&&!r.taf?`<div class="wxr na">ดึงข้อมูลไม่ได้ (ต้องใช้อินเทอร์เน็ต และอาจถูกจำกัด CORS) — <a href="https://weather.rtaf.mi.th/wx/wx_new/About/Metar%20Taf/Metar.html" target="_blank" rel="noopener">เปิดหน้า METAR (RTAF)</a></div>`:"");
+    el.querySelector("[data-rf]").onclick=()=>wxInto(el,icao,true);
+  }catch(e){el.innerHTML=`<div class="wxr na">โหลดไม่สำเร็จ (${esc(e.message||"network error")})</div>`}
+}
+
+/* --- map layers --- */
+const gAip=L.layerGroup().addTo(map),gNav=L.layerGroup();
+AIP_AD.forEach(a=>{
+  const c=AIP_OPC[a.op]||"#6b7b8d";
+  const m=L.marker([a.lat,a.lon],{icon:L.divIcon({className:"",html:`<div class="apk" style="background:${c}">✈</div>`,iconSize:[30,30],iconAnchor:[15,15]})}).addTo(gAip);
+  m.bindPopup(`<div style="min-width:260px"><b style="font-size:15px;color:${c}">${a.icao}</b><br><b>${esc(a.name)}</b>
+    <div class="kv" style="margin-top:6px"><b>เมือง</b><span>${esc(a.city)}</span><b>พิกัด</b><span>${dms(a.lat,1)} ${dms(a.lon,0)}</span><b>ความสูง</b><span>${a.elev}</span><b>ผู้ดำเนินการ</b><span>${a.op}</span></div>
+    <div style="margin:8px 0"><a href="${aipUrl(a.icao)}" target="_blank" rel="noopener">📄 เปิด AIP Aerodrome Data (AD 2.${a.icao})</a></div>
+    <div class="wxb" data-wx="${a.icao}"></div></div>`,{maxWidth:320,maxHeight:460});
+  m.on("popupopen",e=>{const el=e.popup.getElement().querySelector(".wxb");if(el)wxInto(el,a.icao)});
+});
+AIP_NAV.forEach(n=>{
+  const c=NAVC[n.type]||"#6b7b8d";
+  L.marker([n.lat,n.lon],{icon:L.divIcon({className:"",html:`<div class="nvk" style="background:${c}"></div>`,iconSize:[14,14],iconAnchor:[7,7]})}).addTo(gNav)
+   .bindPopup(`<b>${esc(n.id)}</b> — ${esc(n.name)}<br>${esc(navTxt(n))}<br><small>${n.ap} · elev ${esc(n.elev)}${n.rwy?" · RWY "+esc(n.rwy):""}</small>`);
+});
+$("#lyAip").onchange=e=>e.target.checked?map.addLayer(gAip):map.removeLayer(gAip);
+$("#lyNav").onchange=e=>e.target.checked?map.addLayer(gNav):map.removeLayer(gNav);
+
+/* --- Flight Publication panel: AIP cards --- */
+function aipCards(){
+  const left=Math.ceil((new Date(new Date(AIRAC).getTime()+28*864e5)-new Date())/864e5),nxt=new Date(new Date(AIRAC).getTime()+28*864e5).toISOString().slice(0,10);
+  return `<div class="sec">AIP · สนามบิน (AIRAC ${AIRAC})</div>
+   <div class="rl">${left<0?`⚠ AIRAC หมดอายุแล้ว ${-left} วัน — ตรวจสอบรอบใหม่ (ถัดไป ${nxt})`:`รอบถัดไป ${nxt} (อีก ${left} วัน)`} · ตรวจสอบกับ AIP/NOTAM ปัจจุบันก่อนใช้งานจริง</div>`+
+   AIP_AD.map(a=>{const c=AIP_OPC[a.op]||"#6b7b8d";return `<div class="card" data-ap="${a.icao}">
+     <div class="t"><span style="color:${c}">✈ ${a.icao}</span><span class="pill">${a.op}</span></div>
+     <div class="s"><b>${esc(a.name)}</b><br>${esc(a.city)} · ${dms(a.lat,1)} ${dms(a.lon,0)} · Elev ${a.elev}</div>
+     <div class="row" style="margin-top:6px"><button class="btn sm" data-apgo>🎯 ดูบนแผนที่</button><button class="btn sm" data-apwp>＋ จุดบิน</button><a class="btn sm" href="${aipUrl(a.icao)}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;color:inherit">📄 AIP</a><button class="btn sm" data-apwx>☁ METAR/TAF</button></div>
+     <div class="wxb" style="display:none"></div></div>`}).join("");
+}
+function bindAip(){
+  body().querySelectorAll("[data-ap]").forEach(card=>{
+    const icao=card.dataset.ap,a=AIP_AD.find(x=>x.icao===icao),wb=card.querySelector(".wxb");
+    card.querySelector("[data-apgo]").onclick=()=>{map.setView([a.lat,a.lon],13);if(innerWidth<760)$("#panel").classList.add("mini")};
+    card.querySelector("[data-apwp]").onclick=()=>{addWp({lat:a.lat,lng:a.lon,name:a.icao});toast(a.icao+" ถูกเพิ่มเป็นจุดบิน",1500)};
+    card.querySelector("[data-apwx]").onclick=()=>{
+      const show=wb.style.display==="none";wb.style.display=show?"block":"none";
+      if(show&&!wb.dataset.loaded){wb.dataset.loaded=1;wxInto(wb,icao)}
+    };
+  });
+}
+
+drawPoc();drawRoute();applyToolTab();
+openTab("tools");
+</script>
+<script>
+"use strict";
+/* =====================================================================
+   Accounts · Profiles · Admin   (backend: Firebase Auth + Firestore)
+   - Members log in with USERNAME + password (username → <username>@missionprep.local for Firebase Auth).
+   - "admin" logs in with a PIN (5259); the real Firebase password is PIN + "#missionprep".
+   - Each account owns any number of mission profiles:
+        users/{uid}                     { username, display, role, disabled, created }
+        users/{uid}/profiles/{pid}      { name, size, updated }          (list view)
+        users/{uid}/profileData/{pid}   { json }                         (the whole profile as one JSON string)
+   - Security Rules: see firestore.rules next to this file.
+   - Add  ?local=1  to the URL to force the offline demo backend (localStorage) — nothing is sent to Firebase.
+   ===================================================================== */
+const FIREBASE_CONFIG={
+  apiKey:"AIzaSyAb0Yk21-SHFg46bPvo5PcIJ6X4eTBiLQo",
+  authDomain:"missionprep-60d27.firebaseapp.com",
+  projectId:"missionprep-60d27",
+  storageBucket:"missionprep-60d27.firebasestorage.app",
+  messagingSenderId:"731918570225",
+  appId:"1:731918570225:web:45c625814d1f5961418f50"
+};
+const USE_FB=!!FIREBASE_CONFIG&&!/[?&]local=1/.test(location.search);
+const ADMIN_USER="admin",ADMIN_PIN="5259",ADMIN_SUFFIX="#missionprep",MAIL_DOMAIN="@missionprep.local";
+const normUser=u=>String(u||"").trim().toLowerCase();
+const okUser=u=>/^[a-z0-9._-]{3,20}$/.test(u);
+const credOf=(u,pw)=>u===ADMIN_USER?pw+ADMIN_SUFFIX:pw;
+const NOUSER=["auth/user-not-found","auth/invalid-credential","auth/invalid-login-credentials","auth/wrong-password"];
+const ERR_TH={
+  "auth/email-already-in-use":"ชื่อผู้ใช้นี้ถูกใช้แล้ว","auth/wrong-password":"ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง","auth/user-not-found":"ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+  "auth/invalid-credential":"ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง","auth/invalid-login-credentials":"ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+  "auth/weak-password":"รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร","auth/too-many-requests":"ลองผิดหลายครั้งเกินไป กรุณารอสักครู่แล้วลองใหม่",
+  "auth/network-request-failed":"เชื่อมต่ออินเทอร์เน็ตไม่ได้","auth/requires-recent-login":"กรุณาออกจากระบบแล้วเข้าใหม่ก่อนเปลี่ยนรหัสผ่าน",
+  "auth/operation-not-allowed":"ยังไม่ได้เปิดการล็อกอินแบบ อีเมล/รหัสผ่าน ใน Firebase Console (Authentication → Sign-in method)",
+  "app/disabled":"บัญชีนี้ถูกระงับ — ติดต่อผู้ดูแลระบบ","app/deleted":"บัญชีนี้ถูกลบแล้ว — ติดต่อผู้ดูแลระบบ",
+  "permission-denied":"ไม่มีสิทธิ์เข้าถึง (ตรวจสอบ Firestore Rules หรือบัญชีอาจถูกระงับ)","unavailable":"เชื่อมต่อ Firebase ไม่ได้"
+};
+const errTH=e=>ERR_TH[(e&&e.code)||""]||(e&&e.message)||"เกิดข้อผิดพลาด";
+const loadScript=src=>new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>rej(new Error("โหลด Firebase SDK ไม่ได้ (ต้องใช้อินเทอร์เน็ต)"));document.head.appendChild(s)});
+
+/* ---------- backend 1: Firebase ---------- */
+const FB={
+  email:u=>u+MAIL_DOMAIN,
+  TS:()=>firebase.firestore.FieldValue.serverTimestamp(),
+  unmute(){setTimeout(()=>{this.mute=false},600)},
+  async init(cb){
+    this.cb=cb;
+    for(const f of ["app","auth","firestore"])await loadScript(`https://www.gstatic.com/firebasejs/10.12.2/firebase-${f}-compat.js`);
+    firebase.initializeApp(FIREBASE_CONFIG);this.auth=firebase.auth();this.db=firebase.firestore();
+    this.auth.onAuthStateChanged(async u=>{
+      if(this.mute)return;
+      if(!u)return cb(null);
+      try{cb(await this.userOf(u))}catch(e){this.mute=true;await this.auth.signOut().catch(()=>{});this.unmute();cb(null,e)}
+    });
+  },
+  async userOf(u){
+    const ref=this.db.collection("users").doc(u.uid),isAdm=u.email===this.email(ADMIN_USER);
+    let s=await ref.get();
+    if(!s.exists){
+      if(!isAdm)throw{code:"app/deleted"};
+      await ref.set({username:ADMIN_USER,display:"ผู้ดูแลระบบ",role:"admin",disabled:false,created:this.TS()});   // first-ever admin login creates its own record
+      s=await ref.get();
+    }
+    const d=s.data();if(d.disabled||d.deleted)throw{code:d.deleted?"app/deleted":"app/disabled"};
+    return{uid:u.uid,username:d.username,display:d.display||"",role:isAdm?"admin":"member"};
+  },
+  async _done(user){const p=await this.userOf(user);this.mute=false;this.cb(p);return p},
+  async _fail(e,created){this.mute=true;if(created)await created.delete().catch(()=>{});else await this.auth.signOut().catch(()=>{});this.unmute();throw e},
+  async signIn(name,pw){
+    this.mute=true;
+    try{const c=await this.auth.signInWithEmailAndPassword(this.email(name),pw);return await this._done(c.user)}catch(e){await this._fail(e)}
+  },
+  async signUp(name,pw,display){
+    this.mute=true;let cu=null;
+    try{
+      const c=await this.auth.createUserWithEmailAndPassword(this.email(name),pw);cu=c.user;
+      if(name!==ADMIN_USER)await this.db.collection("users").doc(cu.uid).set({username:name,display:display||"",role:"member",disabled:false,created:this.TS()});
+      return await this._done(cu);
+    }catch(e){await this._fail(e,cu)}
+  },
+  signOut(){return this.auth.signOut()},
+  async changePassword(pw){await this.auth.currentUser.updatePassword(pw)},
+  U(uid){return this.db.collection("users").doc(uid)},
+  async listProfiles(uid){
+    const s=await this.U(uid).collection("profiles").get();
+    return s.docs.map(d=>{const x=d.data();return{id:d.id,name:x.name,size:x.size||0,updated:x.updated&&x.updated.toMillis?x.updated.toMillis():0}}).sort((a,b)=>b.updated-a.updated);
+  },
+  async getProfile(uid,pid){
+    const [m,d]=await Promise.all([this.U(uid).collection("profiles").doc(pid).get(),this.U(uid).collection("profileData").doc(pid).get()]);
+    if(!m.exists)throw{message:"ไม่พบโปรไฟล์"};
+    return{name:m.data().name,json:d.exists?d.data().json:"{}"};
+  },
+  async putProfile(uid,pid,o){
+    const u=this.U(uid);pid=pid||u.collection("profiles").doc().id;
+    const b=this.db.batch();
+    b.set(u.collection("profiles").doc(pid),{name:o.name,size:o.json.length,updated:this.TS()});
+    b.set(u.collection("profileData").doc(pid),{json:o.json});
+    await b.commit();return pid;
+  },
+  async delProfile(uid,pid){
+    const u=this.U(uid),b=this.db.batch();
+    b.delete(u.collection("profiles").doc(pid));b.delete(u.collection("profileData").doc(pid));await b.commit();
+  },
+  async listUsers(){
+    const s=await this.db.collection("users").get();
+    return s.docs.map(d=>{const x=d.data();return{uid:d.id,username:x.username,display:x.display||"",disabled:!!x.disabled,deleted:!!x.deleted,created:x.created&&x.created.toMillis?x.created.toMillis():0}});
+  },
+  async createUser(name,pw,display){   // admin adds a member without losing its own session (secondary app instance)
+    const app2=firebase.initializeApp(FIREBASE_CONFIG,"adm"+Date.now());
+    try{
+      const a2=app2.auth(),c=await a2.createUserWithEmailAndPassword(this.email(name),pw);
+      await a2.signOut();
+      await this.U(c.user.uid).set({username:name,display:display||"",role:"member",disabled:false,created:this.TS()});
+      return c.user.uid;
+    }finally{await app2.delete().catch(()=>{})}
+  },
+  async updateUser(uid,patch){await this.U(uid).update(patch)},
+  async deleteUser(uid){   // client SDK cannot delete another user's Auth account → wipe data + leave a disabled tombstone
+    const ps=await this.U(uid).collection("profiles").get();
+    for(const d of ps.docs)await this.delProfile(uid,d.id);
+    await this.U(uid).update({disabled:true,deleted:true,display:""});
+  }
+};
+
+const MEM={};
+const store={
+  get(k){try{return localStorage.getItem(k)}catch(_){return k in MEM?MEM[k]:null}},
+  set(k,v){try{localStorage.setItem(k,v)}catch(_){MEM[k]=String(v)}},
+  del(k){try{localStorage.removeItem(k)}catch(_){delete MEM[k]}}
+};
+/* ---------- backend 2: offline demo (localStorage) ---------- */
+const LOC={
+  K:"mp_local_v1",
+  get(){try{return JSON.parse(store.get(this.K))||{users:{},prof:{},data:{}}}catch(_){return{users:{},prof:{},data:{}}}},
+  put(d){store.set(this.K,JSON.stringify(d))},
+  async hash(s){
+    if(window.crypto&&crypto.subtle){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode("mp|"+s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+    let h=5381;for(const c of "mp|"+s)h=((h<<5)+h+c.charCodeAt(0))|0;return"d"+h;
+  },
+  pub(uid,u){return{uid,username:u.username,display:u.display||"",role:u.username===ADMIN_USER?"admin":"member"}},
+  async init(cb){
+    this.cb=cb;const d=this.get(),sid=store.get(this.K+"_s"),u=sid&&d.users[sid];
+    if(u&&!u.disabled&&!u.deleted)cb(this.pub(sid,u));else cb(null);
+  },
+  async signIn(name,pw){
+    const d=this.get(),e=Object.entries(d.users).find(([,u])=>u.username===name);
+    if(!e)throw{code:"auth/user-not-found"};
+    const[uid,u]=e;
+    if(u.hash!==await this.hash(pw))throw{code:"auth/wrong-password"};
+    if(u.deleted||u.disabled)throw{code:u.deleted?"app/deleted":"app/disabled"};
+    store.set(this.K+"_s",uid);const p=this.pub(uid,u);this.cb(p);return p;
+  },
+  async _make(name,pw,display){
+    const d=this.get();
+    if(Object.values(d.users).some(u=>u.username===name))throw{code:"auth/email-already-in-use"};
+    if(pw.length<6)throw{code:"auth/weak-password"};
+    const uid="u"+uid_();d.users[uid]={username:name,display:display||"",hash:await this.hash(pw),disabled:false,created:Date.now()};this.put(d);return uid;
+  },
+  async signUp(name,pw,display){
+    const uid=await this._make(name,pw,display);store.set(this.K+"_s",uid);
+    const p=this.pub(uid,this.get().users[uid]);this.cb(p);return p;
+  },
+  signOut(){store.del(this.K+"_s");this.cb(null)},
+  async changePassword(pw){
+    if(pw.length<6)throw{code:"auth/weak-password"};
+    const d=this.get(),uid=store.get(this.K+"_s");d.users[uid].hash=await this.hash(pw);this.put(d);
+  },
+  async listProfiles(uid){const d=this.get();return Object.entries(d.prof[uid]||{}).map(([id,x])=>({id,name:x.name,size:x.size,updated:x.updated})).sort((a,b)=>b.updated-a.updated)},
+  async getProfile(uid,pid){const d=this.get(),m=(d.prof[uid]||{})[pid];if(!m)throw{message:"ไม่พบโปรไฟล์"};return{name:m.name,json:(d.data[uid]||{})[pid]||"{}"}},
+  async putProfile(uid,pid,o){
+    const d=this.get();pid=pid||"p"+uid_();
+    (d.prof[uid]=d.prof[uid]||{})[pid]={name:o.name,size:o.json.length,updated:Date.now()};
+    (d.data[uid]=d.data[uid]||{})[pid]=o.json;this.put(d);return pid;
+  },
+  async delProfile(uid,pid){const d=this.get();if(d.prof[uid])delete d.prof[uid][pid];if(d.data[uid])delete d.data[uid][pid];this.put(d)},
+  async listUsers(){return Object.entries(this.get().users).map(([uid,u])=>({uid,username:u.username,display:u.display||"",disabled:!!u.disabled,deleted:!!u.deleted,created:u.created||0}))},
+  async createUser(name,pw,display){return this._make(name,pw,display)},
+  async updateUser(uid,patch){const d=this.get();Object.assign(d.users[uid],patch);this.put(d)},
+  async deleteUser(uid){const d=this.get();delete d.prof[uid];delete d.data[uid];Object.assign(d.users[uid],{disabled:true,deleted:true,display:""});this.put(d)}
+};
+const uid_=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const BK=USE_FB?FB:LOC;
+
+/* ---------- helpers ---------- */
+const G=document.getElementById("gate");
+const gshow=h=>{G.style.display="flex";G.innerHTML=`<div class="gcard">${h}</div>`;G.scrollTop=0};
+const ghide=()=>{G.style.display="none";G.innerHTML=""};
+const fdate=ms=>ms?new Date(ms).toLocaleString("th-TH",{dateStyle:"medium",timeStyle:"short"}):"";
+const busy=(btn,on)=>{if(btn){btn.disabled=on;btn.style.opacity=on?.6:1}};
+function setSaveSt(s){
+  const el=document.getElementById("saveSt");if(!el)return;
+  el.textContent=s==="ok"?"☁✓":s==="wait"?"☁…":s==="saving"?"☁⏳":"☁⚠";
+  el.title=s==="ok"?"บันทึกแล้ว":s==="err"?"บันทึกไม่สำเร็จ — จะลองใหม่เมื่อมีการแก้ไข":"กำลังบันทึก…";
+}
+async function flushSave(){
+  if(!dirty||!SES.pid||SES.loading)return;
+  dirty=false;setSaveSt("saving");
+  try{
+    const json=JSON.stringify(DB);
+    if(json.length>950000)throw{message:"ข้อมูลโปรไฟล์ใหญ่เกิน ~1MB — ลบเลเยอร์ KML/GPX ที่นำเข้าบางส่วนออก"};
+    await BK.putProfile(SES.ownerUid,SES.pid,{name:SES.name,json});setSaveSt("ok");
+  }catch(e){dirty=true;setSaveSt("err");if(e&&e.message&&!e.code)toast(e.message,4000)}
+}
+window.addEventListener("online",()=>flushSave());
+window.addEventListener("beforeunload",e=>{if(dirty){e.preventDefault();e.returnValue=""}});
+document.addEventListener("visibilitychange",()=>{if(document.hidden)flushSave()});
+
+const exportObj=(name,data)=>({app:"missionprep",v:1,name,exported:new Date().toISOString(),data});
+const safeName=s=>String(s||"profile").replace(/[^\w฀-๿.-]+/g,"_").slice(0,40);
+function teamsToProfile(teams){   // legacy/sample "teams" → aircraft + crew
+  const d=newDB();
+  teams.forEach(t=>{
+    const id=uid();
+    d.ac.push({id,reg:t.tail,type:t.ac,base:"",status:"rdy",speed:100,burn:0,fuelU:"kg",fuelCap:0,endur:0,payload:0,seats:0});
+    t.members.forEach(m=>d.crew.push({id:uid(),acId:id,rank:m.rank||"",name:m.name,weight:"",role:m.pos||"",phone:m.phone||""}));
+  });
+  return d;
+}
+const SAMPLE_TEAMS=[
+  {ac:"ฮ.13",tail:"20206",members:[
+    {pos:"นบ.",rank:"น.ต.",name:"ธนวรรษ ภาคาหาญ",phone:"096-965-0570"},{pos:"นบ.",rank:"น.ต.",name:"พรภวิษย์ กลับไชย",phone:"095-165-0892"},
+    {pos:"นบ.",rank:"ร.อ.",name:"อภิชาติ คล่องแคล่ว",phone:"093-296-6625"},{pos:"ชอ.",rank:"(75)พ.อ.อ.",name:"คเณศ ประเสริฐสุข",phone:"064-195-4198"},
+    {pos:"ชอ.",rank:"(80)พ.อ.อ.",name:"ไพรัตน์ จุยานนท์",phone:"063-936-1966"},{pos:"สอ.",rank:"(70)จ.อ.",name:"ณัฐภูมิ บุญมี",phone:"092-684-3762"}]},
+  {ac:"ฮ.13",tail:"20201",members:[
+    {pos:"นบ.",rank:"น.ท.",name:"ธนเดช สุขยืน",phone:"095-939-5755"},{pos:"นบ.",rank:"น.ต.",name:"กิตติภัทท์ อู่ตะเภา",phone:"065-309-4651"},
+    {pos:"นบ.",rank:"น.ต.",name:"วชิระ อาษานอก",phone:"087-942-5745"},{pos:"ชอ.",rank:"(90)พ.อ.อ.",name:"ณัฐวี แนบสนิท",phone:"063-230-5407"},
+    {pos:"ชอ.",rank:"(60)พ.อ.อ.",name:"นุวัฒน์ มีทอง",phone:"082-546-6919"},{pos:"สอ.",rank:"(65)จ.อ.",name:"ณฤเบศร วรรณโร",phone:"082-202-5602"}]}
+];
+function legacyData(){   // data saved by the pre-account version of this app in this browser
+  try{
+    const o=JSON.parse(localStorage.getItem(KEY)||"null");if(!o)return null;
+    const d=Object.assign(newDB(),o);
+    if(Array.isArray(o.teams)&&o.teams.length){const t=teamsToProfile(o.teams);d.ac=d.ac.concat(t.ac);d.crew=t.crew}
+    delete d.teams;
+    return(d.poc.length||d.ac.length||d.routes.length||d.logs.length||d.crew.length)?d:null;
+  }catch(_){return null}
+}
+
+/* ---------- applying a profile to the running app ---------- */
+function applyProfile(){
+  Object.keys(impG).forEach(k=>{map.removeLayer(impG[k]);delete impG[k]});
+  DB.imp=DB.imp||[];DB.imp.forEach(buildImp);renderImp();
+  drawPoc();drawRoute();
+  if(DB.cg&&DB.cg.on){Object.assign(CG,DB.cg,{c:L.latLng(DB.cg.c.lat,DB.cg.c.lng)});CG.s=Math.max(100,Math.round(CG.s/100)*100);cgRefresh()}
+  else{CG.on=false;CG.locked=false;gCG.clearLayers();gCGh.clearLayers();cgHd=null;cgSync()}
+  const m=DB.meas||{};
+  TOOL.pts=(m.pts||[]).map(p=>L.latLng(p[0],p[1]));TOOL.c=m.c?L.latLng(m.c[0],m.c[1]):null;TOOL.e=m.e?L.latLng(m.e[0],m.e[1]):null;TOOL.sel=null;
+  drawMeas();
+  if(tab)render();
+}
+function resetApp(){SES.loading=true;SES.pid=null;SES.name="";DB=newDB();applyProfile();SES.loading=false;dirty=false}
+async function openProfile(owner,pid){
+  const p=await BK.getProfile(owner,pid);
+  let d={};try{d=JSON.parse(p.json||"{}")}catch(_){}
+  if(dirty)await flushSave();
+  SES.loading=true;
+  DB=Object.assign(newDB(),d);DB.mission=Object.assign({name:"",start:"",end:""},DB.mission);
+  SES.ownerUid=owner;SES.pid=pid;SES.name=p.name;
+  applyProfile();SES.loading=false;dirty=false;setSaveSt("ok");ghide();updateAcct();
+  if(!tab)openTab("tools");
+}
+async function createProfile(name,data){
+  const pid=await BK.putProfile(SES.ownerUid,null,{name,json:JSON.stringify(data)});
+  await openProfile(SES.ownerUid,pid);
+}
+function updateAcct(){
+  const b=document.getElementById("bAcct");
+  b.style.display=SES.user?"":"none";
+  document.getElementById("acctN").textContent=SES.user?SES.user.username+(SES.viewing?" › "+SES.viewing.username:""):"";
+}
+const importFile=cb=>{
+  const i=document.createElement("input");i.type="file";i.accept=".json,application/json";
+  i.onchange=()=>{const f=i.files[0];if(!f)return;const r=new FileReader();
+    r.onload=()=>{try{const j=JSON.parse(r.result),data=j&&j.app==="missionprep"?j.data:j;
+      if(!data||typeof data!=="object"||Array.isArray(data))throw 0;cb(Object.assign(newDB(),data),(j&&j.name)||f.name.replace(/\.json$/i,""))}catch(_){toast("ไฟล์โปรไฟล์ไม่ถูกต้อง")}};
+    r.readAsText(f)};
+  i.click();
+};
+
+/* ---------- screens: login / register ---------- */
+function renderLogin(msg){
+  const mode=window._lm||"in";
+  gshow(`<div class="gh">🚁 Mission Prep<small>เตรียมภารกิจ · GIS</small></div>
+   ${USE_FB?"":`<div class="gwarn">⚠ โหมดทดลองในเครื่อง (ไม่ได้ใช้ Firebase) — ข้อมูลอยู่ในเบราว์เซอร์นี้เท่านั้น</div>`}
+   <div class="seg" id="lseg"><button data-m="in" class="${mode==="in"?"on":""}">เข้าสู่ระบบ</button><button data-m="up" class="${mode==="up"?"on":""}">สมัครสมาชิก</button></div>
+   <form id="gf" autocomplete="on">
+     <label>ชื่อผู้ใช้ ${mode==="up"?"(a-z 0-9 . _ - ยาว 3–20 ตัว)":""}</label><input id="gu" autocapitalize="none" autocomplete="username" spellcheck="false" required>
+     ${mode==="up"?`<label>ชื่อ-สกุล / ยศ (แสดงในระบบ — ไม่บังคับ)</label><input id="gd" autocomplete="name">`:""}
+     <label>${mode==="up"?"รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)":"รหัสผ่าน"}</label><input id="gp" type="password" autocomplete="${mode==="up"?"new-password":"current-password"}" required>
+     ${mode==="up"?`<label>ยืนยันรหัสผ่าน</label><input id="gp2" type="password" autocomplete="new-password" required>`:""}
+     <div id="gerr" class="gerr">${msg?esc(msg):""}</div>
+     <button class="btn pri" id="gsub" style="width:100%;margin-top:6px">${mode==="in"?"เข้าสู่ระบบ":"สมัครและเข้าสู่ระบบ"}</button>
+   </form>
+   <div class="rl" style="margin-top:8px">${mode==="in"?"ผู้ดูแลระบบ: ชื่อผู้ใช้ admin และใส่ PIN ในช่องรหัสผ่าน":"หลังสมัครแล้วจะสร้างโปรไฟล์ภารกิจแรกได้ทันที"}</div>`);
+  document.querySelectorAll("#lseg button").forEach(b=>b.onclick=()=>{window._lm=b.dataset.m;renderLogin()});
+  document.getElementById("gf").onsubmit=async ev=>{
+    ev.preventDefault();
+    const u=normUser(document.getElementById("gu").value),pw=document.getElementById("gp").value,err=document.getElementById("gerr"),btn=document.getElementById("gsub");
+    err.textContent="";busy(btn,true);
+    try{
+      if(mode==="in")await doLogin(u,pw);
+      else{
+        if(!okUser(u))throw{message:"ชื่อผู้ใช้ต้องเป็น a-z 0-9 . _ - ยาว 3–20 ตัว"};
+        if(u===ADMIN_USER)throw{message:"ชื่อผู้ใช้นี้สงวนไว้"};
+        if(pw.length<6)throw{code:"auth/weak-password"};
+        if(pw!==document.getElementById("gp2").value)throw{message:"รหัสผ่านทั้งสองช่องไม่ตรงกัน"};
+        await BK.signUp(u,pw,document.getElementById("gd").value.trim());
+      }
+    }catch(e){err.textContent=errTH(e);busy(btn,false)}
+  };
+}
+async function doLogin(u,pw){
+  try{return await BK.signIn(u,credOf(u,pw))}
+  catch(e){
+    // first-ever admin login (correct PIN, account not created yet) → create it
+    if(u===ADMIN_USER&&pw===ADMIN_PIN&&NOUSER.includes(e.code)){
+      try{return await BK.signUp(ADMIN_USER,credOf(u,pw),"ผู้ดูแลระบบ")}catch(e2){throw{code:"auth/wrong-password"}}
+    }
+    throw e;
+  }
+}
+function onAuth(user,err){
+  if(!user){
+    SES.user=null;SES.ownerUid=null;SES.viewing=null;ADMIN=false;dirty=false;
+    resetApp();updateAcct();if(!err&&SES.wasIn)window._lm="in";SES.wasIn=false;renderLogin(err?errTH(err):"");return;
+  }
+  if(SES.user&&SES.user.uid===user.uid&&SES.pid)return;
+  SES.user=user;SES.wasIn=true;SES.ownerUid=user.uid;SES.viewing=null;ADMIN=user.role==="admin";
+  updateAcct();if(tab)render();renderProfiles();
+}
+
+/* ---------- screen: profile list ---------- */
+async function renderProfiles(){
+  const owner=SES.ownerUid,own=owner===SES.user.uid;
+  gshow(`<div class="gh">🚁 Mission Prep</div><div class="rl">กำลังโหลดโปรไฟล์…</div>`);
+  let list=[],msg="";
+  try{list=await BK.listProfiles(owner)}catch(e){msg=errTH(e)}
+  const legacy=own&&legacyData();
+  const who=own?SES.user:SES.viewing;
+  gshow(`<div class="gbar"><div>👤 <b>${esc(who.username)}</b>${own&&ADMIN?' <span class="pill ok">admin</span>':""}</div>
+     <div class="row">${ADMIN&&own?'<button class="btn sm" id="gadm">🛠 จัดการสมาชิก</button>':""}<button class="btn sm" id="gout">ออกจากระบบ</button></div></div>
+   ${!own?`<div class="gwarn">กำลังจัดการบัญชีของ <b>${esc(who.username)}</b> ในฐานะผู้ดูแลระบบ <button class="btn sm" id="gbadm" style="margin-left:6px">← กลับหน้าแอดมิน</button></div>`:""}
+   ${msg?`<div class="gerr">${esc(msg)}</div>`:""}
+   <div class="sec">โปรไฟล์ภารกิจ (${list.length})</div>
+   ${list.map(p=>`<div class="card" data-p="${esc(p.id)}"><div class="t"><span>📁 ${esc(p.name)}</span><span class="pill">${esc(fdate(p.updated))}</span></div>
+      <div class="row" style="margin-top:6px"><button class="btn pri sm" data-o>เปิด</button><button class="btn sm" data-x>⬇ ส่งออก</button><button class="btn sm bad" data-d>ลบ</button></div></div>`).join("")||`<div class="empty">ยังไม่มีโปรไฟล์ — สร้างโปรไฟล์ภารกิจแรกได้เลย</div>`}
+   <div class="row" style="margin-top:10px"><button class="btn pri" id="gnew">＋ โปรไฟล์ภารกิจใหม่</button><button class="btn" id="gimp">⬆ นำเข้า (.json)</button></div>
+   <div class="row" style="margin-top:6px"><button class="btn sm" id="gsmp">＋ จากตัวอย่าง ฮ.13 (20206 / 20201)</button>${legacy?'<button class="btn sm" id="gleg">⬆ นำเข้าข้อมูลเดิมจากเครื่องนี้</button>':""}</div>
+   ${SES.pid?'<div class="row" style="margin-top:12px"><button class="btn" id="gback">← กลับไปแผนที่</button></div>':""}`);
+  const $g=s=>G.querySelector(s);
+  $g("#gout").onclick=logout;
+  if($g("#gadm"))$g("#gadm").onclick=renderAdmin;
+  if($g("#gbadm"))$g("#gbadm").onclick=()=>{SES.ownerUid=SES.user.uid;SES.viewing=null;renderAdmin()};
+  if($g("#gback"))$g("#gback").onclick=ghide;
+  $g("#gnew").onclick=()=>startWizard("new");
+  $g("#gimp").onclick=()=>importFile((d,n)=>createProfile(n+" (นำเข้า)",d).catch(e=>toast(errTH(e))));
+  $g("#gsmp").onclick=()=>createProfile("ตัวอย่าง ฮ.13",teamsToProfile(SAMPLE_TEAMS)).catch(e=>toast(errTH(e)));
+  if($g("#gleg"))$g("#gleg").onclick=()=>createProfile("ข้อมูลเดิมในเครื่อง",legacyData()).catch(e=>toast(errTH(e)));
+  G.querySelectorAll("[data-p]").forEach(c=>{
+    const pid=c.dataset.p,nm=(list.find(p=>p.id===pid)||{}).name;
+    c.querySelector("[data-o]").onclick=()=>openProfile(owner,pid).catch(e=>toast(errTH(e)));
+    c.querySelector("[data-x]").onclick=async()=>{try{const p=await BK.getProfile(owner,pid);download(`mission_${safeName(p.name)}.json`,JSON.stringify(exportObj(p.name,JSON.parse(p.json||"{}")),null,1),"application/json")}catch(e){toast(errTH(e))}};
+    c.querySelector("[data-d]").onclick=async()=>{
+      if(!confirm(`ลบโปรไฟล์ “${nm}” ถาวร?`))return;
+      try{await BK.delProfile(owner,pid);if(SES.pid===pid){SES.pid=null;resetApp()}renderProfiles()}catch(e){toast(errTH(e))}
+    };
+  });
+}
+async function logout(){try{await flushSave()}catch(_){}SES.pid=null;await BK.signOut()}
+
+/* ---------- wizard: 1 date/time → 2 aircraft → 3 crew ---------- */
+let W=null;
+const AC_DEFAULTS={base:"",status:"rdy",speed:100,burn:0,fuelU:"kg",fuelCap:0,endur:0,payload:0,seats:0};
+function startWizard(mode){
+  const edit=mode==="edit";
+  W={mode,step:1,name:edit?SES.name:"",start:edit?DB.mission.start||"":"",end:edit?DB.mission.end||"":"",
+     ac:edit?DB.ac.map(a=>({id:a.id,type:a.type||"",reg:a.reg||""})):[],
+     crew:edit?DB.crew.map(m=>({...m})):[]};
+  renderWizard();
+}
+function wizardApply(target){
+  const old=new Map(target.ac.map(a=>[a.id,a]));
+  target.ac=W.ac.filter(a=>a.type.trim()||a.reg.trim()).map(a=>Object.assign({},AC_DEFAULTS,old.get(a.id)||{},{id:a.id,type:a.type.trim(),reg:a.reg.trim()}));
+  const ids=new Set(target.ac.map(a=>a.id));
+  target.crew=W.crew.filter(m=>String(m.name).trim()).map(m=>({...m,name:String(m.name).trim(),acId:ids.has(m.acId)?m.acId:"",weight:m.weight===""||m.weight==null?"":(+m.weight||0)}));
+  target.mission={name:W.name,start:W.start,end:W.end};
+}
+function wizardFinish(){
+  if(W.mode==="edit"){
+    wizardApply(DB);SES.name=W.name.trim()||SES.name;save();ghide();
+    if(tab)render();toast("บันทึกข้อมูลภารกิจแล้ว",1500);
+  }else{
+    const d=newDB();wizardApply(d);
+    createProfile(W.name.trim()||"โปรไฟล์ใหม่",d).catch(e=>toast(errTH(e)));
+  }
+}
+function renderWizard(){
+  const s=W.step,titles=["ช่วงวันเวลาที่ปฏิบัติภารกิจ","อากาศยานที่ปฏิบัติภารกิจ","ผู้ปฏิบัติภารกิจ"];
+  let body="";
+  if(s===1)body=`
+    <label>ชื่อโปรไฟล์ / ภารกิจ</label><input data-w="name" value="${esc(W.name)}" placeholder="เช่น ช่วยน้ำท่วม กทม. รอบ 1">
+    <div class="grid2"><div><label>เริ่ม</label><input type="datetime-local" data-w="start" value="${esc(W.start)}"></div><div><label>สิ้นสุด</label><input type="datetime-local" data-w="end" value="${esc(W.end)}"></div></div>
+    <div class="rl" id="wdur"></div>`;
+  if(s===2)body=`
+    <div class="rl">แบบเครื่อง / หมายเลขเครื่อง</div>
+    <div id="wac">${W.ac.map((a,i)=>`<div class="row" style="flex-wrap:nowrap;margin:6px 0" data-i="${i}"><input data-f="type" value="${esc(a.type)}" placeholder="แบบเครื่อง เช่น ฮ.13 / H135"><input data-f="reg" value="${esc(a.reg)}" placeholder="หมายเลขเครื่อง เช่น 20206" style="max-width:170px"><button class="btn sm bad" data-rm>✕</button></div>`).join("")||`<div class="empty">ยังไม่มีอากาศยาน</div>`}</div>
+    <button class="btn" id="wacAdd">＋ เพิ่มอากาศยาน</button>`;
+  if(s===3)body=`
+    <div class="rl">เลือกว่าแต่ละคนขึ้นเครื่องลำไหน · ยศ ชื่อ-นามสกุล น้ำหนักตัว (กก.) หน้าที่ เบอร์ติดต่อ</div>
+    <div id="wcrew">${W.crew.map((m,i)=>`<div class="wc" data-i="${i}">
+      <div class="grid2"><select data-f="acId"><option value="">— ไม่ระบุอากาศยาน —</option>${W.ac.filter(a=>a.type.trim()||a.reg.trim()).map(a=>`<option value="${esc(a.id)}" ${a.id===m.acId?"selected":""}>${esc(a.type)} · ${esc(a.reg)}</option>`).join("")}</select>
+        <select data-f="role">${ROLES.map(r=>`<option ${r===m.role?"selected":""}>${r}</option>`).join("")}</select></div>
+      <div class="grid2"><input data-f="rank" value="${esc(m.rank)}" placeholder="ยศ"><input data-f="weight" type="number" inputmode="decimal" step="any" value="${esc(m.weight)}" placeholder="น้ำหนักตัว (กก.)"></div>
+      <input data-f="name" value="${esc(m.name)}" placeholder="ชื่อ-นามสกุล">
+      <div class="row" style="flex-wrap:nowrap"><input data-f="phone" type="tel" value="${esc(m.phone)}" placeholder="เบอร์ติดต่อ"><button class="btn sm bad" data-rm title="ลบ">✕</button></div></div>`).join("")||`<div class="empty">ยังไม่มีผู้ปฏิบัติภารกิจ</div>`}</div>
+    <div class="row"><button class="btn" id="wcAdd">＋ เพิ่มบุคคล</button></div>
+    <div class="wsum" id="wsum"></div>`;
+  gshow(`<div class="gbar"><div class="gh" style="margin:0">📋 ${W.mode==="edit"?"แก้ไขข้อมูลภารกิจ":"โปรไฟล์ภารกิจใหม่"}<small>ขั้นตอน ${s}/3 · ${titles[s-1]}</small></div><div class="row">${W.mode==="new"?`<button class="btn sm" id="wcancel">← รายการโปรไฟล์</button>`:""}<button class="btn sm" id="wskipall">${W.mode==="edit"?"✕ ปิด":"ข้ามทั้งหมด"}</button></div></div>
+    <div class="gsteps">${[1,2,3].map(n=>`<i class="${n<=s?"on":""}"></i>`).join("")}</div>
+    ${body}
+    <div class="row" style="justify-content:space-between;margin-top:14px">
+      <button class="btn" id="wback" ${s===1?"disabled":""}>← ย้อนกลับ</button>
+      <div class="row"><button class="btn" id="wskip">ข้ามขั้นตอนนี้</button><button class="btn pri" id="wnext">${s===3?"✓ เสร็จสิ้น":"ถัดไป →"}</button></div></div>`);
+  const $g=q=>G.querySelector(q);
+  // bindings — every input writes straight into W
+  G.querySelectorAll("[data-w]").forEach(el=>el.oninput=el.onchange=()=>{W[el.dataset.w]=el.value;durNote()});
+  const rows=(id,arr,mk)=>{
+    G.querySelectorAll(`#${id} [data-i]`).forEach(r=>{
+      const i=+r.dataset.i;
+      r.querySelectorAll("[data-f]").forEach(el=>el.oninput=el.onchange=()=>{arr[i][el.dataset.f]=el.value;if(id==="wcrew")crewSum()});
+      r.querySelector("[data-rm]").onclick=()=>{arr.splice(i,1);renderWizard()};
+    });
+  };
+  const durNote=()=>{const el=$g("#wdur");if(!el)return;const a=new Date(W.start),b=new Date(W.end);
+    el.textContent=isFinite(a)&&isFinite(b)&&W.start&&W.end?(b<a?"⚠ เวลาสิ้นสุดอยู่ก่อนเวลาเริ่ม":`ระยะเวลา ${Math.floor((b-a)/36e5)} ชม. ${Math.round((b-a)%36e5/6e4)} นาที`):""};
+  const crewSum=()=>{const el=$g("#wsum");if(!el)return;
+    el.innerHTML=W.ac.filter(a=>a.type.trim()||a.reg.trim()).map(a=>{const ms=W.crew.filter(m=>m.acId===a.id);const w=ms.reduce((t,m)=>t+(+m.weight||0),0);return `🚁 ${esc(a.type)} · ${esc(a.reg)}: ${ms.length} คน${w?` · ⚖ ${w} กก.`:""}`}).join("<br>")};
+  if(s===1)durNote();
+  if(s===2){rows("wac",W.ac);$g("#wacAdd").onclick=()=>{W.ac.push({id:uid(),type:W.ac.length?W.ac[W.ac.length-1].type:"",reg:""});renderWizard()}}
+  if(s===3){
+    rows("wcrew",W.crew);crewSum();
+    $g("#wcAdd").onclick=()=>{const last=W.crew[W.crew.length-1],first=W.ac[0];W.crew.push({id:uid(),acId:last?last.acId:first?first.id:"",rank:"",name:"",weight:"",role:ROLES[0],phone:""});renderWizard()};
+  }
+  $g("#wback").onclick=()=>{W.step--;renderWizard()};
+  $g("#wskip").onclick=()=>{s===3?wizardFinish():(W.step++,renderWizard())};
+  $g("#wnext").onclick=()=>{s===3?wizardFinish():(W.step++,renderWizard())};
+  if($g("#wcancel"))$g("#wcancel").onclick=()=>renderProfiles();
+  $g("#wskipall").onclick=()=>{if(W.mode==="edit"){ghide()}else{wizardFinish()}};
+}
+
+/* ---------- admin console ---------- */
+async function renderAdmin(){
+  SES.ownerUid=SES.user.uid;SES.viewing=null;updateAcct();
+  gshow(`<div class="gh">🛠 จัดการสมาชิก</div><div class="rl">กำลังโหลด…</div>`);
+  let us=[],msg="";
+  try{us=(await BK.listUsers()).filter(u=>u.username!==ADMIN_USER).sort((a,b)=>a.username.localeCompare(b.username))}catch(e){msg=errTH(e)}
+  gshow(`<div class="gbar"><div class="gh" style="margin:0">🛠 จัดการสมาชิก<small>${us.length} บัญชี</small></div><button class="btn sm" id="abk">← กลับ</button></div>
+   ${msg?`<div class="gerr">${esc(msg)}</div>`:""}
+   <div class="row"><button class="btn pri" id="uadd">＋ เพิ่มสมาชิก</button></div>
+   <div class="rl" style="margin-top:6px">“ลบ” = ลบข้อมูลทั้งหมดของสมาชิกและระงับบัญชี (ชื่อผู้ใช้ยังถูกจองใน Firebase Auth — ลบถาวรได้ที่ Firebase Console → Authentication → Users)</div>
+   ${us.map(u=>`<div class="card" data-u="${esc(u.uid)}"><div class="t"><span>👤 ${esc(u.username)}${u.display?` <small style="font-weight:400;color:var(--mut)">${esc(u.display)}</small>`:""}</span><span class="pill ${u.deleted?"bad":u.disabled?"warn":"ok"}">${u.deleted?"ลบแล้ว":u.disabled?"ระงับ":"ใช้งาน"}</span></div>
+     <div class="s">สมัครเมื่อ ${esc(fdate(u.created))||"-"}</div>
+     <div class="row" style="margin-top:6px">${u.deleted?"":`<button class="btn sm" data-prof>📂 โปรไฟล์</button><button class="btn sm" data-ed>✎ แก้ไข</button><button class="btn sm bad" data-del>🗑 ลบ</button>`}</div></div>`).join("")||`<div class="empty">ยังไม่มีสมาชิก</div>`}
+   <div class="row" style="margin-top:12px"><button class="btn" id="aown">📁 โปรไฟล์ของฉัน (admin)</button></div>`);
+  const $g=q=>G.querySelector(q);
+  $g("#abk").onclick=renderProfiles;$g("#aown").onclick=renderProfiles;
+  $g("#uadd").onclick=()=>form("เพิ่มสมาชิก",[{k:"u",l:"ชื่อผู้ใช้ (a-z 0-9 . _ - 3–20 ตัว)",r:1},{k:"p",l:"รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)",t:"password",r:1},{k:"d",l:"ชื่อ-สกุล / ยศ"}],{},async o=>{
+    const u=normUser(o.u);
+    try{
+      if(!okUser(u)||u===ADMIN_USER)throw{message:"ชื่อผู้ใช้ไม่ถูกต้อง หรือเป็นชื่อที่สงวนไว้"};
+      if(o.p.length<6)throw{code:"auth/weak-password"};
+      await BK.createUser(u,o.p,o.d.trim());toast("เพิ่มสมาชิกแล้ว",1500);
+    }catch(e){toast(errTH(e),3500)}
+    renderAdmin();
+  });
+  G.querySelectorAll("[data-u]").forEach(c=>{
+    const uid=c.dataset.u,u=us.find(x=>x.uid===uid);
+    const pf=c.querySelector("[data-prof]");if(!pf)return;
+    pf.onclick=()=>{SES.ownerUid=uid;SES.viewing=u;updateAcct();renderProfiles()};
+    c.querySelector("[data-ed]").onclick=()=>form("แก้ไขสมาชิก: "+u.username,[{k:"d",l:"ชื่อ-สกุล / ยศ"},{k:"s",l:"สถานะ",t:"select",o:[["0","ใช้งาน"],["1","ระงับการใช้งาน"]]}],{d:u.display,s:u.disabled?"1":"0"},async o=>{
+      try{await BK.updateUser(uid,{display:o.d.trim(),disabled:o.s==="1"})}catch(e){toast(errTH(e),3500)}
+      renderAdmin();
+    });
+    c.querySelector("[data-del]").onclick=async()=>{
+      if(!confirm(`ลบสมาชิก “${u.username}” และข้อมูลโปรไฟล์ทั้งหมด?`))return;
+      try{await BK.deleteUser(uid);toast("ลบแล้ว",1500)}catch(e){toast(errTH(e),3500)}
+      renderAdmin();
+    };
+  });
+}
+
+/* ---------- account menu (header 👤) ---------- */
+function missionLine(){const m=DB.mission||{};return m.start||m.end?`📅 ${esc(fdate(m.start))} → ${esc(fdate(m.end))}`:"ยังไม่ได้ระบุช่วงวันเวลา"}
+function openAcct(){
+  if(!SES.user)return;
+  const own=SES.ownerUid===SES.user.uid,md=document.getElementById("mdlg"),mb=document.getElementById("mbody");
+  mb.innerHTML=`<h3 style="margin:0 0 6px">👤 ${esc(SES.user.username)} ${ADMIN?'<span class="pill ok">admin</span>':""}</h3>
+    <div class="rl">${SES.pid?`โปรไฟล์: <b>${esc(SES.name)}</b>${own?"":` (บัญชีของ ${esc((SES.viewing||{}).username||"")})`}<br>${missionLine()}`:"ยังไม่ได้เปิดโปรไฟล์"}</div>
+    <div class="alist">
+     ${SES.pid?`<button class="btn" data-a="save">💾 บันทึกตอนนี้</button>
+       <button class="btn" data-a="wiz">📋 แก้ไขข้อมูลภารกิจ (วันเวลา / อากาศยาน / ผู้ปฏิบัติ)</button>
+       <button class="btn" data-a="exp">⬇ ส่งออกโปรไฟล์นี้ (.json)</button>`:""}
+     <button class="btn" data-a="prof">🗂 โปรไฟล์ทั้งหมด / สร้างใหม่</button>
+     <button class="btn" data-a="imp">⬆ นำเข้าโปรไฟล์ (.json)</button>
+     ${ADMIN?'<button class="btn" data-a="adm">🛠 จัดการสมาชิก</button>':'<button class="btn" data-a="pw">🔑 เปลี่ยนรหัสผ่าน</button>'}
+     <button class="btn" data-a="out">🚪 ออกจากระบบ</button>
+     <button class="btn" data-a="x">ปิด</button></div>`;
+  const act={
+    save:async()=>{dirty=true;await flushSave();toast(dirty?"บันทึกไม่สำเร็จ":"บันทึกแล้ว",1500)},
+    wiz:()=>startWizard("edit"),
+    exp:()=>download(`mission_${safeName(SES.name)}.json`,JSON.stringify(exportObj(SES.name,DB),null,1),"application/json"),
+    prof:()=>renderProfiles(),
+    imp:()=>importFile((d,n)=>createProfile(n+" (นำเข้า)",d).catch(e=>toast(errTH(e)))),
+    adm:()=>renderAdmin(),
+    pw:()=>form("เปลี่ยนรหัสผ่าน",[{k:"a",l:"รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)",t:"password",r:1},{k:"b",l:"ยืนยันรหัสผ่านใหม่",t:"password",r:1}],{},async o=>{
+      try{if(o.a!==o.b)throw{message:"รหัสผ่านทั้งสองช่องไม่ตรงกัน"};await BK.changePassword(o.a);toast("เปลี่ยนรหัสผ่านแล้ว",2000)}catch(e){toast(errTH(e),3500)}
+    }),
+    out:()=>logout(),x:()=>{}
+  };
+  mb.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>{md.close();act[b.dataset.a]()});
+  md.showModal();
+}
+document.getElementById("bAcct").onclick=openAcct;
+
+/* ---------- boot ---------- */
+(async function boot(){
+  gshow(`<div class="gh">🚁 Mission Prep<small>เตรียมภารกิจ · GIS</small></div><div class="rl">กำลังเชื่อมต่อระบบ…</div>`);
+  try{await BK.init(onAuth)}
+  catch(e){gshow(`<div class="gh">🚁 Mission Prep</div><div class="gerr">${esc(errTH(e))}</div><div class="row" style="margin-top:10px"><button class="btn pri" id="gretry">ลองใหม่</button><button class="btn" id="glocal">ใช้โหมดทดลองในเครื่อง</button></div>`);
+    G.querySelector("#gretry").onclick=()=>location.reload();
+    G.querySelector("#glocal").onclick=()=>{location.search="?local=1"}}
+})();
+</script>
+</body>
+</html>
