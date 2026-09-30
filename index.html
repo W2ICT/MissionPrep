@@ -406,6 +406,16 @@ map.on("click",e=>{
 });
 
 /* ---------- generic form dialog ---------- */
+// show/hide toggle (👁) for password inputs
+function attachEye(inp){
+  if(inp.dataset.eye)return;inp.dataset.eye=1;
+  const w=document.createElement("div");w.style.cssText="position:relative";
+  inp.parentNode.insertBefore(w,inp);w.appendChild(inp);inp.style.paddingRight="44px";
+  const b=document.createElement("button");b.type="button";b.textContent="👁";b.title="แสดง/ซ่อนรหัส";
+  b.style.cssText="position:absolute;right:2px;top:50%;transform:translateY(-50%);border:0;background:transparent;font-size:17px;width:40px;height:32px;cursor:pointer;opacity:.6";
+  b.onclick=()=>{const show=inp.type==="password";inp.type=show?"text":"password";b.textContent=show?"🙈":"👁";b.style.opacity=show?1:.6;inp.focus()};
+  w.appendChild(b);
+}
 function form(title,fields,vals,onSave,extra){
   const f=$("#dform");
   f.innerHTML=`<h3>${esc(title)}</h3>`+fields.map(x=>{
@@ -424,6 +434,7 @@ function form(title,fields,vals,onSave,extra){
     d.close();onSave(o);
   };
   $("#fcancel").onclick=()=>d.close();
+  f.querySelectorAll("input[type=password]").forEach(attachEye);
   d.showModal();
   return f;
 }
@@ -1688,6 +1699,7 @@ const ERR_TH={
   "auth/invalid-credential":"ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง","auth/invalid-login-credentials":"ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
   "auth/weak-password":"รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร","auth/too-many-requests":"ลองผิดหลายครั้งเกินไป กรุณารอสักครู่แล้วลองใหม่",
   "auth/network-request-failed":"เชื่อมต่ออินเทอร์เน็ตไม่ได้","auth/requires-recent-login":"กรุณาออกจากระบบแล้วเข้าใหม่ก่อนเปลี่ยนรหัสผ่าน",
+  "auth/configuration-not-found":"Firebase Authentication ยังไม่ได้เปิดใช้ในโปรเจ็คนี้ — Firebase Console → Build → Authentication → กด Get started แล้วเปิด Sign-in method: Email/Password",
   "auth/operation-not-allowed":"ยังไม่ได้เปิดการล็อกอินแบบ อีเมล/รหัสผ่าน ใน Firebase Console (Authentication → Sign-in method)",
   "app/disabled":"บัญชีนี้ถูกระงับ — ติดต่อผู้ดูแลระบบ","app/deleted":"บัญชีนี้ถูกลบแล้ว — ติดต่อผู้ดูแลระบบ",
   "permission-denied":"ไม่มีสิทธิ์เข้าถึง (ตรวจสอบ Firestore Rules หรือบัญชีอาจถูกระงับ)","unavailable":"เชื่อมต่อ Firebase ไม่ได้"
@@ -1949,6 +1961,7 @@ function renderLogin(msg){
      <button class="btn pri" id="gsub" style="width:100%;margin-top:6px">${mode==="in"?"เข้าสู่ระบบ":"สมัครและเข้าสู่ระบบ"}</button>
    </form>
    <div class="rl" style="margin-top:8px">${mode==="in"?"ผู้ดูแลระบบ: ชื่อผู้ใช้ admin และใส่ PIN ในช่องรหัสผ่าน":"หลังสมัครแล้วจะสร้างโปรไฟล์ภารกิจแรกได้ทันที"}</div>`);
+  G.querySelectorAll("input[type=password]").forEach(attachEye);
   document.querySelectorAll("#lseg button").forEach(b=>b.onclick=()=>{window._lm=b.dataset.m;renderLogin()});
   document.getElementById("gf").onsubmit=async ev=>{
     ev.preventDefault();
