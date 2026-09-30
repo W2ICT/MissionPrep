@@ -1806,7 +1806,7 @@ const LOC={
     if(window.crypto&&crypto.subtle){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode("mp|"+s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
     let h=5381;for(const c of "mp|"+s)h=((h<<5)+h+c.charCodeAt(0))|0;return"d"+h;
   },
-  pub(uid,u){return{uid,username:u.username,display:u.display||"",role:u.username===ADMIN_USER?"admin":"member"}},
+  pub(uid,u){return{uid,username:u.username,display:u.display||"",role:(u.username===ADMIN_USER||u.username==="dev")?"admin":"member"}},
   async init(cb){
     this.cb=cb;const d=this.get(),sid=store.get(this.K+"_s"),u=sid&&d.users[sid];
     if(u&&!u.disabled&&!u.deleted)cb(this.pub(sid,u));else cb(null);
@@ -1848,7 +1848,7 @@ const LOC={
   async deleteUser(uid){const d=this.get();delete d.prof[uid];delete d.data[uid];Object.assign(d.users[uid],{disabled:true,deleted:true,display:""});this.put(d)}
 };
 const uid_=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-const BK=USE_FB?FB:LOC;
+let BK=USE_FB?FB:LOC;   // switched to LOC while in DEV fast-track mode
 
 /* ---------- helpers ---------- */
 const G=document.getElementById("gate");
@@ -1960,7 +1960,9 @@ function renderLogin(msg){
      <div id="gerr" class="gerr">${msg?esc(msg):""}</div>
      <button class="btn pri" id="gsub" style="width:100%;margin-top:6px">${mode==="in"?"เข้าสู่ระบบ":"สมัครและเข้าสู่ระบบ"}</button>
    </form>
-   <div class="rl" style="margin-top:8px">${mode==="in"?"ผู้ดูแลระบบ: ชื่อผู้ใช้ admin และใส่ PIN ในช่องรหัสผ่าน":"หลังสมัครแล้วจะสร้างโปรไฟล์ภารกิจแรกได้ทันที"}</div>`);
+   <div class="rl" style="margin-top:8px">${mode==="in"?"ผู้ดูแลระบบ: ชื่อผู้ใช้ admin และใส่ PIN ในช่องรหัสผ่าน":"หลังสมัครแล้วจะสร้างโปรไฟล์ภารกิจแรกได้ทันที"}</div>
+   <div style="text-align:center;margin-top:10px"><button class="btn sm" id="gdev" type="button" style="opacity:.7">🛠 Dev fast-track</button></div>`);
+  G.querySelector("#gdev").onclick=devPrompt;
   G.querySelectorAll("input[type=password]").forEach(attachEye);
   document.querySelectorAll("#lseg button").forEach(b=>b.onclick=()=>{window._lm=b.dataset.m;renderLogin()});
   document.getElementById("gf").onsubmit=async ev=>{
@@ -1989,14 +1991,37 @@ async function doLogin(u,pw){
     throw e;
   }
 }
+/* ---------- DEV fast-track (PIN) — skips the login and works on a local-only profile store (never touches Firebase) ---------- */
+function devPrompt(){
+  form("🛠 Dev fast-track",[{k:"pin",l:"รหัส Dev",t:"password",r:1}],{},o=>{
+    if(o.pin!==ADMIN_PIN){toast("รหัสไม่ถูกต้อง",1800);return}
+    enterDev().catch(e=>toast(errTH(e),3500));
+  });
+}
+async function enterDev(){
+  BK=LOC;SES.dev=true;LOC.cb=onAuth;
+  const d=LOC.get();
+  let uid=(Object.entries(d.users).find(([,u])=>u.username==="dev")||[])[0];
+  if(!uid)uid=await LOC._make("dev","dev-"+ADMIN_PIN+"-local","DEV");
+  store.set(LOC.K+"_s",uid);
+  LOC.cb(LOC.pub(uid,LOC.get().users[uid]));
+}
+async function autoOpenDev(){
+  const uid=SES.user.uid,list=await BK.listProfiles(uid);
+  if(list.length)await openProfile(uid,list[0].id);else await createProfile("DEV",newDB());
+  toast("โหมด DEV — ข้อมูลอยู่ในเครื่องนี้เท่านั้น (ไม่ขึ้น Firebase)",3500);
+}
 function onAuth(user,err){
   if(!user){
     SES.user=null;SES.ownerUid=null;SES.viewing=null;ADMIN=false;dirty=false;
+    if(SES.dev){SES.dev=false;BK=USE_FB?FB:LOC}   // leave DEV mode → back to the real backend
     resetApp();updateAcct();if(!err&&SES.wasIn)window._lm="in";SES.wasIn=false;renderLogin(err?errTH(err):"");return;
   }
   if(SES.user&&SES.user.uid===user.uid&&SES.pid)return;
   SES.user=user;SES.wasIn=true;SES.ownerUid=user.uid;SES.viewing=null;ADMIN=user.role==="admin";
-  updateAcct();if(tab)render();renderProfiles();
+  updateAcct();if(tab)render();
+  if(SES.dev){autoOpenDev();return}
+  renderProfiles();
 }
 
 /* ---------- screen: profile list ---------- */
